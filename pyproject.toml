@@ -1,0 +1,53 @@
+[project]
+name = "vit-for-iqa"
+version = "0.1.0"
+description = "Vision Transformer for Full-Reference Image Quality Assessment"
+authors = [
+    {name = "Jan Kostka (aka DarkEliat)", email = "jan.kostka0606@gmail.com"}
+]
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+
+dependencies = [
+    # --- CORE deep learning ---
+    "torch",
+    "torchvision",
+    "timm",
+
+    # --- NUMPY / DATA PROCESSING ---
+    "numpy",
+    "pandas",
+
+    # --- IMAGE PROCESSING ---
+    "Pillow",
+    "scikit-image",
+    "opencv-python",
+
+    # --- METRYKI IQA ---
+    "scikit-learn",
+
+    # --- ViT & tensor ops ---
+    "einops",
+
+    # --- CONFIG SYSTEM ---
+    "pyyaml",
+]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+
+[tool.poetry]
+name = "vit-for-iqa"
+version = "0.1.0"
+description = "Vision Transformer for Full-Reference Image Quality Assessment"
+authors = ["Jan Kostka (aka DarkEliat)"]
+package-mode = false
+
+
+[tool.poetry.group.dev.dependencies]
+matplotlib = "*"
+tqdm = "*"
+tensorboard = "*"
