@@ -28,6 +28,7 @@ dependencies = [
 
     # --- ViT & tensor ops ---
     "einops",
+    "safetensors (>=0.7.0,<0.8.0)",
 
     # --- CONFIG SYSTEM ---
     "pyyaml",
