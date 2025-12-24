@@ -4,6 +4,9 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 
 CONFIGS_PATH = PROJECT_ROOT / 'configs/'
+CONFIG_TRAIN_KADID10K_BASELINE_PATH = CONFIGS_PATH / 'train_kadid10k_vit_base_patch16_224_baseline.yaml'
+CONFIG_TRAIN_TID2008_BASELINE_PATH = CONFIGS_PATH / 'train_tid2008_vit_base_patch16_224_baseline.yaml'
+CONFIG_TRAIN_TID2013_BASELINE_PATH = CONFIGS_PATH / 'train_tid2013_vit_base_patch16_224_baseline.yaml'
+CONFIG_TRAIN_LIVE_BASELINE_PATH = CONFIGS_PATH / 'train_live_vit_base_patch16_224_baseline.yaml'
 
 SRC_PATH = PROJECT_ROOT / 'src/'
-

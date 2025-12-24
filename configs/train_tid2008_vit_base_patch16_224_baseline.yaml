@@ -1,8 +1,8 @@
-experiment_name: "exp_tid2008_baseline"
+config_name: "tid2008_vit_base_patch16_224_baseline"
 
 dataset:
-  name: "TID2008"
-  type: "tid2008"
+  representative_name: "TID2008"
+  name: "tid2008"
   images_path: "datasets/tid2008/distorted_images"
   labels_path: "datasets/tid2008/mos.txt"
   train_split: 0.8
@@ -22,4 +22,3 @@ training:
 logging:
   tensorboard: true
   save_checkpoint_every: 1
-  checkpoints_path: "experiments/checkpoints/tid2008_baseline"

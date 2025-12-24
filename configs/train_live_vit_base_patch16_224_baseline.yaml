@@ -1,10 +1,10 @@
-experiment_name: "exp_tid2013_baseline"
+config_name: "live_vit_base_patch16_224_baseline"
 
 dataset:
-  name: "TID2013"
-  type: "tid2013"
-  images_path: "datasets/tid2013/distorted_images"
-  labels_path: "datasets/tid2013/mos.txt"
+  representative_name: "LIVE IQA"
+  name: "live"
+  images_path: "datasets/live/images"
+  labels_path: "datasets/live/dmos_realigned.mat"
   train_split: 0.8
   batch_size: 8
   input_size: 224
@@ -22,4 +22,3 @@ training:
 logging:
   tensorboard: true
   save_checkpoint_every: 1
-  checkpoints_path: "experiments/checkpoints/tid2013_baseline"

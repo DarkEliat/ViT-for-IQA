@@ -1,10 +1,10 @@
-experiment_name: "exp_live_vit_baseline"
+config_name: "kadid10k_vit_base_patch16_224_baseline"
 
 dataset:
-  name: "LIVE IQA"
-  type: "live"
-  images_path: "datasets/live/images"
-  labels_path: "datasets/live/dmos_realigned.mat"
+  representative_name: "KADID-10k"
+  name: "kadid10k"
+  images_path: "datasets/kadid10k/images"
+  labels_path: "datasets/kadid10k/dmos.csv"
   train_split: 0.8
   batch_size: 8
   input_size: 224
@@ -22,4 +22,3 @@ training:
 logging:
   tensorboard: true
   save_checkpoint_every: 1
-  checkpoints_path: "experiments/checkpoints/live_baseline"

@@ -3,13 +3,11 @@ from typing import Any
 import yaml
 
 from src.training.trainer import Trainer
-from src.utils.paths import CONFIGS_PATH
+from src.utils.paths import CONFIG_TRAIN_KADID10K_BASELINE_PATH
 
 
 def main() -> None:
-    config_file_path = CONFIGS_PATH / 'train_kadid10k_baseline.yaml'
-
-    with open(config_file_path, 'r') as config_file:
+    with open(CONFIG_TRAIN_KADID10K_BASELINE_PATH, 'r') as config_file:
         config: dict[str, Any] = yaml.safe_load(config_file)
 
     trainer = Trainer(config=config)
