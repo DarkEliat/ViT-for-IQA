@@ -5,9 +5,9 @@ import shutil
 from typing import Any
 
 import yaml
-from torch.distributed.nn import all_gather
 
-from src.utils.paths import CONFIGS_PATH, EXPERIMENTS_PATH, PROJECT_ROOT
+from src.utils.paths import CONFIGS_PATH, EXPERIMENTS_PATH
+from src.utils.dataset_split import generate_and_save_dataset_split
 
 
 def clear_screen():
@@ -68,10 +68,11 @@ def create_experiment(config_file_path, experiment_name: str):
         experiment_name_path,
         experiment_name_path / 'checkpoints/',
         experiment_name_path / 'logs/',
-        experiment_name_path / 'logs' / 'tensorboard/'
+        experiment_name_path / 'logs' / 'tensorboard/',
+        experiment_name_path / 'splits/'
     ]
 
-    files_to_create = [
+    empty_files_to_create = [
         experiment_name_path / 'logs' / 'train.log',
         experiment_name_path / 'metrics.csv',
         experiment_name_path / 'metrics.json',
@@ -82,10 +83,16 @@ def create_experiment(config_file_path, experiment_name: str):
         for folder in folders_to_create:
             folder.mkdir(parents=True, exist_ok=True)
 
-        for file in files_to_create:
+        for file in empty_files_to_create:
             file.touch(exist_ok=False)
 
         shutil.copy2(config_file_path, (experiment_name_path / 'config.yaml'))
+
+        generate_and_save_dataset_split(
+            dataset_length=config['dataset']['length'],
+            train_split=config['training']['train_split'],
+            output_directory=(experiment_name_path / 'splits/')
+        )
     except FileExistsError:
         raise FileExistsError(
             f'Error: Eksperyment `{experiment_name}` dla datasetu `{dataset_name}` już istnieje!\n'

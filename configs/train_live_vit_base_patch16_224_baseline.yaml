@@ -3,17 +3,18 @@ config_name: "live_vit_base_patch16_224_baseline"
 dataset:
   representative_name: "LIVE IQA"
   name: "live"
+  length: 320
   images_path: "datasets/live/images"
   labels_path: "datasets/live/dmos_realigned.mat"
-  train_split: 0.8
-  batch_size: 8
-  input_size: 224
 
 model:
   name: "vit_base_patch16_224"
+  input_size: 224
   embedding_dimension: 768
 
 training:
+  train_split: 0.8
+  batch_size: 8
   num_of_epochs: 5
   learning_rate: 0.0001
   computation_unit: "cuda"
