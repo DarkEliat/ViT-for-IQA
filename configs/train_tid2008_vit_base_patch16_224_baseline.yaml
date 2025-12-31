@@ -4,7 +4,8 @@ dataset:
   representative_name: "TID2008"
   name: "tid2008"
   length: 1700
-  images_path: "datasets/tid2008/distorted_images"
+  reference_images_path: "datasets/tid2008/reference_images/"
+  distorted_images_path: "datasets/tid2008/distorted_images/"
   labels_path: "datasets/tid2008/mos.txt"
 
 model:

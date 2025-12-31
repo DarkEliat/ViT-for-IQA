@@ -4,8 +4,9 @@ dataset:
   representative_name: "LIVE IQA"
   name: "live"
   length: 320
-  images_path: "datasets/live/images"
-  labels_path: "datasets/live/dmos_realigned.mat"
+  reference_images_path: "datasets/live/Images/"
+  distorted_images_path: "datasets/live/Images/"
+  labels_path: "datasets/live/MOS.mat"
 
 model:
   name: "vit_base_patch16_224"

@@ -4,7 +4,8 @@ dataset:
   representative_name: "KADID-10k"
   name: "kadid10k"
   length: 10125
-  images_path: "datasets/kadid10k/images"
+  reference_images_path: "datasets/kadid10k/images/"
+  distorted_images_path: "datasets/kadid10k/images/"
   labels_path: "datasets/kadid10k/dmos.csv"
 
 model:
