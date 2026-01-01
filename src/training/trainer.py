@@ -8,10 +8,10 @@ from torch.utils.data import DataLoader, random_split, Dataset
 from torch.optim import Adam, Optimizer
 from torch.utils.tensorboard import SummaryWriter
 
-from src.data.kadid10k_dataset import Kadid10kDataset
-from src.data.live_dataset import LiveDataset
-from src.data.tid2008_dataset import Tid2008Dataset
-from src.data.tid2013_dataset import Tid2013Dataset
+from src.datasets.kadid10k_dataset import Kadid10kDataset
+from src.datasets.live_dataset import LiveDataset
+from src.datasets.tid2008_dataset import Tid2008Dataset
+from src.datasets.tid2013_dataset import Tid2013Dataset
 from src.models.vit_regressor import VitRegressor
 
 
