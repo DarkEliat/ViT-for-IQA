@@ -6,14 +6,31 @@ dataset:
   length: 1700
   reference_images_path: "datasets/tid2008/reference_images/"
   distorted_images_path: "datasets/tid2008/distorted_images/"
-  labels_path: "datasets/tid2008/mos.txt"
+  quality_label:
+    type: "mos"
+    min: 0
+    max: 9
+  labels_path: "datasets/tid2008/mos_with_names.txt"
 
 model:
   name: "vit_base_patch16_224"
-  input_size: 224
+  input:
+    type: "images"
+    num_of_images: 2
+    have_same_image_size: true
+    are_images_square: true
+    image_size: 224
   embedding_dimension: 768
+  output:
+    type: "normalized_mos"
+    min: 0
+    max: 1
 
 training:
+  quality_label:
+    type: "normalized_mos"
+    min: 0
+    max: 1
   train_split: 0.8
   batch_size: 8
   num_of_epochs: 5

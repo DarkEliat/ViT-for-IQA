@@ -1,19 +1,36 @@
 config_name: "live_vit_base_patch16_224_baseline"
 
 dataset:
-  representative_name: "LIVE IQA"
+  representative_name: "LIVE Wild Compressed Picture Quality Database"
   name: "live"
   length: 320
   reference_images_path: "datasets/live/Images/"
   distorted_images_path: "datasets/live/Images/"
+  quality_label:
+    type: "mos"
+    min: 1
+    max: 100
   labels_path: "datasets/live/MOS.mat"
 
 model:
   name: "vit_base_patch16_224"
-  input_size: 224
+  input:
+    type: "images"
+    num_of_images: 2
+    have_same_image_size: true
+    are_images_square: true
+    image_size: 224
   embedding_dimension: 768
+  output:
+    type: "normalized_mos"
+    min: 0
+    max: 1
 
 training:
+  quality_label:
+    type: "normalized_mos"
+    min: 0
+    max: 1
   train_split: 0.8
   batch_size: 8
   num_of_epochs: 5
