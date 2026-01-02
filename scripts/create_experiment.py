@@ -6,6 +6,7 @@ from typing import Any
 
 import yaml
 
+from src.utils.config_consistency import check_consistency
 from src.utils.paths import CONFIGS_PATH, EXPERIMENTS_PATH
 from src.utils.dataset_split import generate_and_save_dataset_split
 
@@ -115,6 +116,8 @@ if __name__ == '__main__':
     all_config_files = get_config_files()
 
     chosen_config_file = menu(config_files=all_config_files)
+
+    check_consistency(config_file_path=chosen_config_file)
 
     experiment_name = get_experiment_name_from_user()
 

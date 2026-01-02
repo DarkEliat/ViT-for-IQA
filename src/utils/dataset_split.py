@@ -2,6 +2,8 @@ import random
 import csv
 from pathlib import Path
 
+import pandas as pd
+
 
 def generate_and_save_dataset_split(
         dataset_length: int,
@@ -23,25 +25,21 @@ def generate_and_save_dataset_split(
     train_indices = all_indices[:train_size]
     validation_indices = all_indices[train_size:]
 
-    _save_split_indices(train_indices, (output_directory / 'train_indices.csv'))
-    _save_split_indices(validation_indices, (output_directory / 'validation_indices.csv'))
+    save_split_indices(train_indices, (output_directory / 'train_indices.csv'))
+    save_split_indices(validation_indices, (output_directory / 'validation_indices.csv'))
 
 
 def load_split_indices(file_path: Path) -> list[int]:
-    indices = []
+    data_frame = pd.read_csv(file_path, header=None, dtype=int)
 
-    with open(file_path, mode='r', newline='', encoding='utf-8') as file:
-        reader = csv.reader(file)
-
-        for row in reader:
-            indices.append(int(row[0]))
+    indices: list[int] = data_frame.iloc[:, 0].tolist()
 
     return indices
 
 
-def _save_split_indices(indices: list[int], output_path: Path) -> None:
-    with open(output_path, mode='w', newline='', encoding='utf-8') as file:
-        writer = csv.writer(file)
+def save_split_indices(indices: list[int], output_path: Path) -> None:
+    if not output_path.parent.exists():
+        raise FileNotFoundError('Error: Wskazany folder do zapisu indeksów datasetu nie istnieje!')
 
-        for index in indices:
-            writer.writerow([index])
+    data_frame = pd.DataFrame(indices)
+    data_frame.to_csv(output_path, header=False, index=False)

@@ -14,6 +14,7 @@ from src.datasets.live_dataset import LiveDataset
 from src.datasets.tid2008_dataset import Tid2008Dataset
 from src.datasets.tid2013_dataset import Tid2013Dataset
 from src.models.vit_regressor import VitRegressor
+from src.utils.config_consistency import check_consistency
 
 
 class Trainer:
@@ -26,9 +27,7 @@ class Trainer:
         self.splits_path = experiment_path / 'splits/'
 
         config_file_path = experiment_path / 'config.yaml'
-        with open(config_file_path, 'r') as config_file:
-            config: dict[str, Any] = yaml.safe_load(config_file)
-
+        config = check_consistency(config_file_path=config_file_path)
         self.config = config
 
         self.device = config['training']['device']
