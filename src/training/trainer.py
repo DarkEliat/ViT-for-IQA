@@ -3,6 +3,7 @@ from typing import Any
 
 import torch
 import torch.nn as nn
+import yaml
 from torch import Tensor
 from torch.utils.data import DataLoader, random_split, Dataset
 from torch.optim import Adam, Optimizer
@@ -16,25 +17,27 @@ from src.models.vit_regressor import VitRegressor
 
 
 class Trainer:
-    def __init__(self, config: dict[str, Any]) -> None:
+    def __init__(self, experiment_path: Path) -> None:
+        self.experiment_name = experiment_path.name
+
+        self.experiment_path = experiment_path
+        self.checkpoints_path = experiment_path / 'checkpoints/'
+        self.logs_path = experiment_path / 'logs/'
+        self.splits_path = experiment_path / 'splits/'
+
+        config_file_path = experiment_path / 'config.yaml'
+        with open(config_file_path, 'r') as config_file:
+            config: dict[str, Any] = yaml.safe_load(config_file)
+
         self.config = config
-        self.config['logging']['checkpoints_path'] = Path(self.config['logging']['checkpoints_path'])
 
-        self.computation_unit = config['training']['device']
-
-        # Logowanie
-        experiment_name = config['experiment_name']
-        self.writer = (
-            SummaryWriter(f'logs/{experiment_name}')
-            if config['logging']['tensorboard']
-            else None
-        )
+        self.device = config['training']['device']
 
         # Inicjalizacja modelu
         self.model = VitRegressor(
             model_name=config['model']['name'],
             embedding_dimension=config['model']['embedding_dimension']
-        ).to(self.computation_unit)
+        ).to(self.device)
 
         # Definicja funkcji straty i optymalizatora
         self.loss_function: nn.Module = nn.MSELoss()
@@ -46,25 +49,28 @@ class Trainer:
         # Dataloadery
         self.train_loader, self.validation_loader = self._create_dataloaders()
 
+        # Logowanie
+        self.log_writer = (
+            SummaryWriter(str(experiment_path))
+            if config['logging']['tensorboard']
+            else None
+        )
+
 
     def _build_dataset(self) -> Dataset:
         config = self.config
 
-        match config['type']:
+        match config['dataset']['name']:
             case 'kadid10k':
-                return Kadid10kDataset(
-                    images_folder_path=config['dataset']['images_path'],
-                    csv_file_path=config['dataset']['labels_path'],
-                    transform=None
-                )
+                return Kadid10kDataset(config=config)
             case 'tid2008':
-                return Tid2008Dataset()
+                return Tid2008Dataset(config=config)
             case 'tid2013':
-                return Tid2013Dataset()
+                return Tid2013Dataset(config=config)
             case 'live':
-                return LiveDataset()
+                return LiveDataset(config=config)
             case _:
-                raise ValueError(f"Error: Niewspierany typ bazy danych: {config['dataset']['type']}!")
+                raise ValueError(f"Error: Niewspierany typ bazy danych: {config['dataset']['name']}!")
 
 
     def _create_dataloaders(self) -> tuple[DataLoader, DataLoader]:
@@ -78,7 +84,7 @@ class Trainer:
 
         whole_dataset_length = len(dataset)  # type: ignore
 
-        train_dataset_length = int(config['dataset']['train_split'] * whole_dataset_length)
+        train_dataset_length = int(config['training']['train_split'] * whole_dataset_length)
         validation_dataset_length = whole_dataset_length - train_dataset_length
 
         train_dataset, validation_dataset = random_split(
@@ -88,14 +94,14 @@ class Trainer:
 
         train_loader = DataLoader(
             train_dataset,
-            batch_size=config['dataset']['batch_size'],
+            batch_size=config['training']['batch_size'],
             shuffle=True,
             num_workers=config['training']['num_of_workers']
         )
 
         validation_loader = DataLoader(
             validation_dataset,
-            batch_size=config['dataset']['batch_size'],
+            batch_size=config['training']['batch_size'],
             shuffle=True,
             num_workers=config['training']['num_of_workers']
         )
@@ -114,9 +120,9 @@ class Trainer:
         batch_count = 0
 
         for reference_image, distorted_image, dmos_value in self.train_loader:
-            reference_image = reference_image.to(self.computation_unit)
-            distorted_image = distorted_image.to(self.computation_unit)
-            dmos_value = dmos_value.to(self.computation_unit)
+            reference_image = reference_image.to(self.device)
+            distorted_image = distorted_image.to(self.device)
+            dmos_value = dmos_value.to(self.device)
 
             self.optimizer.zero_grad()
 
@@ -144,9 +150,9 @@ class Trainer:
 
         with torch.no_grad():
             for reference_image, distorted_image, dmos_value in self.validation_loader:
-                reference_image = reference_image.to(self.computation_unit)
-                distorted_image = distorted_image.to(self.computation_unit)
-                dmos_value = dmos_value.to(self.computation_unit)
+                reference_image = reference_image.to(self.device)
+                distorted_image = distorted_image.to(self.device)
+                dmos_value = dmos_value.to(self.device)
 
                 prediction: Tensor = self.model(reference_image, distorted_image)
                 loss: Tensor = self.loss_function(prediction, dmos_value)
@@ -157,12 +163,29 @@ class Trainer:
         return running_loss / max(batch_count, 1)
 
 
+    def is_checkpoint_save_due(self, num_of_epoch) -> bool:
+        if (self.config['checkpointing']['save_every_n_epochs'] > 0 and
+            num_of_epoch % self.config['checkpointing']['save_every_n_epochs'] == 0):
+            return True
+
+        # TODO: Dodać zapisywanie ostatniej epoki i usuwanie przed ostatniej epoki,
+        #  jeśli nie spełnia warunków częstotliwości ani najlepszego aktualnego wyniku
+        if self.config['checkpointing']['save_last_epoch']:
+            ...
+
+        # TODO: Dodać zapisywanie najlepszej epoki, a co za tym idzie również możliwość ich porównywania
+        if self.config['checkpointing']['save_best_epoch']:
+            ...
+
+        return False
+
+
     def _save_checkpoint(self, num_of_epoch: int) -> None:
         """
         Zapisuje wagi modelu do pliku.
         """
 
-        checkpoint_path = self.config['logging']['checkpoints_path'] / f"epoch_{num_of_epoch}.pth"
+        checkpoint_path = self.checkpoints_path / f"epoch_{num_of_epoch}.pth"
 
         torch.save(self.model.state_dict(), checkpoint_path)
         print(f"[Trainer] Zapisano checkpoint do: {checkpoint_path}")
@@ -177,9 +200,9 @@ class Trainer:
             train_loss = self._train_one_epoch()
             validation_loss = self._validate_one_epoch()
 
-            if self.writer:
-                self.writer.add_scalar('loss/train', train_loss, epoch)
-                self.writer.add_scalar('loss/validation', validation_loss, epoch)
+            if self.log_writer:
+                self.log_writer.add_scalar('loss/train', train_loss, epoch)
+                self.log_writer.add_scalar('loss/validation', validation_loss, epoch)
 
             print(
                 f"Epoka {epoch} / {num_of_epochs}  "
@@ -187,5 +210,5 @@ class Trainer:
                 f"|  Błąd walidacji: {validation_loss:.4f}"
             )
 
-            if epoch % self.config['logging']['save_checkpoint_every'] == 0:
+            if self.is_checkpoint_save_due(num_of_epoch=epoch):
                 self._save_checkpoint(epoch)

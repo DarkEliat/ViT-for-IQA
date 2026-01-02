@@ -1,9 +1,4 @@
-from pathlib import Path
-import pandas as pd
-from PIL import Image
-import torch
-from torch.utils.data import Dataset
+from src.datasets.base_dataset import BaseDataset
 
 
-class Tid2013Dataset(Dataset):
-    pass
+class Tid2013Dataset(BaseDataset): pass
