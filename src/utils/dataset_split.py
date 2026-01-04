@@ -9,7 +9,7 @@ def generate_and_save_dataset_split(
         dataset_length: int,
         train_split: float,
         output_directory: Path,
-        random_seed: int = 42
+        random_seed: int
 ) -> None:
     if not output_directory.exists():
         raise FileNotFoundError(f'Error: Wskazany folder do zapisania splitów treningowego i walidacyjnego nie istnieje!\n'

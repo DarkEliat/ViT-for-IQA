@@ -91,8 +91,9 @@ def create_experiment(config_file_path, experiment_name: str):
 
         generate_and_save_dataset_split(
             dataset_length=config['dataset']['length'],
-            train_split=config['training']['train_split'],
-            output_directory=(experiment_name_path / 'splits/')
+            train_split=config['training']['split']['train_split'],
+            output_directory=(experiment_name_path / 'splits/'),
+            random_seed=config['training']['split']['random_seed']
         )
     except FileExistsError:
         raise FileExistsError(

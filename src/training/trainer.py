@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 import yaml
 from torch import Tensor
-from torch.utils.data import DataLoader, random_split, Dataset
+from torch.utils.data import DataLoader, Dataset, Subset
 from torch.optim import Adam, Optimizer
 from torch.utils.tensorboard import SummaryWriter
 
@@ -15,15 +15,20 @@ from src.datasets.tid2008_dataset import Tid2008Dataset
 from src.datasets.tid2013_dataset import Tid2013Dataset
 from src.models.vit_regressor import VitRegressor
 from src.utils.config_consistency import check_consistency
+from src.utils.dataset_split import load_split_indices
 
 
 class Trainer:
     def __init__(self, experiment_path: Path) -> None:
+        if not experiment_path.exists():
+            raise FileNotFoundError('Error: Wskazany eksperyment nie istnieje!')
+
         self.experiment_name = experiment_path.name
 
         self.experiment_path = experiment_path
         self.checkpoints_path = experiment_path / 'checkpoints/'
         self.logs_path = experiment_path / 'logs/'
+        self.logs_tensorboard_path = self.logs_path / 'tensorboard/'
         self.splits_path = experiment_path / 'splits/'
 
         config_file_path = experiment_path / 'config.yaml'
@@ -50,7 +55,7 @@ class Trainer:
 
         # Logowanie
         self.log_writer = (
-            SummaryWriter(str(experiment_path))
+            SummaryWriter(str(self.logs_tensorboard_path))
             if config['logging']['tensorboard']
             else None
         )
@@ -77,19 +82,27 @@ class Trainer:
         Tworzy dataloadery do treningu i walidacji dla wybranej bazy danych.
         """
 
+        train_indices_path = self.splits_path / 'train_indices.csv'
+        validation_indices_path = self.splits_path / 'validation_indices.csv'
+
+        if not train_indices_path.exists() or not validation_indices_path.exists():
+            raise FileNotFoundError(
+                f"Error: Brak co najmniej jednego pliku .csv splitu datasetu!\n"
+                f"Wymagane pliki to:\n"
+                f"{train_indices_path}\n"
+                f"{validation_indices_path}\n"
+                f"Upewnij się, że eksperyment został poprawnie utworzony."
+            )
+
         config = self.config
 
+
+        train_indices = load_split_indices(file_path=train_indices_path)
+        validation_indices = load_split_indices(file_path=validation_indices_path)
+
         dataset: Dataset = self._build_dataset()
-
-        whole_dataset_length = len(dataset)  # type: ignore
-
-        train_dataset_length = int(config['training']['train_split'] * whole_dataset_length)
-        validation_dataset_length = whole_dataset_length - train_dataset_length
-
-        train_dataset, validation_dataset = random_split(
-            dataset,
-            lengths=[train_dataset_length, validation_dataset_length]
-        )
+        train_dataset = Subset(dataset, train_indices)
+        validation_dataset = Subset(dataset, validation_indices)
 
         train_loader = DataLoader(
             train_dataset,

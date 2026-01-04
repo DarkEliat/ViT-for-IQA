@@ -60,6 +60,14 @@ def _check_dataset_section(dataset: dict[str, Any]) -> None:
             'labels_path',
     })
 
+    # --------------- representative_name ---------------
+    if not isinstance(dataset['representative_name'], str) or dataset['representative_name'].strip() == '':
+        raise ValueError('Error: `dataset.representative_name` musi być niepustym stringiem!')
+
+    # --------------- name ---------------
+    if not isinstance(dataset['name'], str) or dataset['name'].strip() == '':
+        raise ValueError('Error: `dataset.name` musi być niepustym stringiem!')
+
     # --------------- length ---------------
     if not isinstance(dataset['length'], int) or dataset['length'] <= 0:
         raise ValueError('Error: `dataset.length` musi być dodatnią liczbą całkowitą!')
@@ -76,6 +84,22 @@ def _check_dataset_section(dataset: dict[str, Any]) -> None:
             original_image_size[dimension_name] <= 0
         ):
             raise ValueError('Error: `dataset.original_image_size` musi zawierać dodatnie wartości `width` oraz `height`!')
+
+    # --------------- reference_images_path ---------------
+    reference_images_path = PROJECT_ROOT / dataset['reference_images_path']
+    if not reference_images_path.exists() or not reference_images_path.is_dir():
+        raise FileNotFoundError(
+            f"Error: `dataset.reference_images_path` nie istnieje lub nie jest katalogiem!\n"
+            f"Ścieżka: {reference_images_path}"
+        )
+
+    # --------------- distorted_images_path ---------------
+    distorted_images_path = PROJECT_ROOT / dataset['distorted_images_path']
+    if not distorted_images_path.exists() or not distorted_images_path.is_dir():
+        raise FileNotFoundError(
+            f"Error: `dataset.distorted_images_path` nie istnieje lub nie jest katalogiem!\n"
+            f"Ścieżka: {distorted_images_path}"
+        )
 
     # --------------- quality_label ---------------
     quality_label = dataset['quality_label']
@@ -101,22 +125,6 @@ def _check_dataset_section(dataset: dict[str, Any]) -> None:
     if quality_label['min'] >= quality_label['max']:
         raise ValueError('Error: `dataset.quality_label` ma niepoprawny zakres (`min` >= `max`)!')
 
-    # --------------- reference_images_path ---------------
-    reference_images_path = PROJECT_ROOT / dataset['reference_images_path']
-    if not reference_images_path.exists() or not reference_images_path.is_dir():
-        raise FileNotFoundError(
-            f"Error: `dataset.reference_images_path` nie istnieje lub nie jest katalogiem!\n"
-            f"Ścieżka: {reference_images_path}"
-        )
-
-    # --------------- distorted_images_path ---------------
-    distorted_images_path = PROJECT_ROOT / dataset['distorted_images_path']
-    if not distorted_images_path.exists() or not distorted_images_path.is_dir():
-        raise FileNotFoundError(
-            f"Error: `dataset.distorted_images_path` nie istnieje lub nie jest katalogiem!\n"
-            f"Ścieżka: {distorted_images_path}"
-        )
-
     # --------------- labels_path ---------------
     labels_path = PROJECT_ROOT / dataset['labels_path']
     if not labels_path.exists() or not labels_path.is_file():
@@ -133,12 +141,12 @@ def _check_model_section(model: dict[str, Any]) -> None:
         required_keys={
             'name',
             'input',
+            'embedding_dimension',
             'output',
-            'embedding_dimension'
         }
     )
 
-    # --------------- model ---------------
+    # --------------- name ---------------
     if not isinstance(model['name'], str) or not model['name']:
         raise ValueError('Error: `model.name` musi być niepustym stringiem!')
 
@@ -228,7 +236,7 @@ def _check_training_section(training: dict[str, Any]) -> None:
         section=training,
         required_keys={
             'quality_label',
-            'train_split',
+            'split',
             'batch_size',
             'num_of_epochs',
             'early_stopping',
@@ -237,22 +245,6 @@ def _check_training_section(training: dict[str, Any]) -> None:
             'num_of_workers',
         },
     )
-
-    # --------------- train_split ---------------
-    if not isinstance(training['train_split'], (int, float)) or not 0 < training['train_split'] < 1:
-        raise ValueError('Error: `training.train_split` musi być z zakresu (0, 1)!')
-
-    # --------------- batch_size ---------------
-    if not isinstance(training['batch_size'], int) or training['batch_size'] <= 0:
-        raise ValueError('Error: `training.batch_size` musi być dodatnią liczbą całkowitą!')
-
-    # --------------- num_of_epochs ---------------
-    if not isinstance(training['num_of_epochs'], int) or training['num_of_epochs'] <= 0:
-        raise ValueError('Error: `training.num_of_epochs` musi być dodatnią liczbą całkowitą!')
-
-    # --------------- learning_rate ---------------
-    if not isinstance(training['learning_rate'], (int, float)) or training['learning_rate'] <= 0:
-        raise ValueError('Error: `training.learning_rate` musi być > 0!')
 
     # --------------- quality_label ---------------
     quality_label = training['quality_label']
@@ -269,11 +261,33 @@ def _check_training_section(training: dict[str, Any]) -> None:
         }
     )
 
-    if quality_label['min'] != 0 or quality_label['max'] != 1:
-        raise ValueError('Error: Zakres `training.quality_label` musi wynosić dokładnie [0, 1]!')
+    # --------------- split ---------------
+    split = training['split']
+    if not isinstance(quality_label, dict):
+        raise TypeError('Error: `training.split` musi być słownikiem (dict)!')
 
-    if quality_label['type'] not in ('normalized_mos', 'inverted_normalized_dmos'):
-        raise ValueError('Error: `training.quality_label.type` musi mieć wartość `normalized_mos` albo `inverted_normalized_dmos`!')
+    _require_keys(
+        section_name='training.quality_label',
+        section=split,
+        required_keys={
+            'train_split',
+            'random_seed',
+        }
+    )
+
+    if not isinstance(training['split']['train_split'], (int, float)) or not 0 < training['split']['train_split'] < 1:
+        raise ValueError('Error: `training.split.train_split` musi być z zakresu (0, 1)!')
+
+    if not isinstance(training['split']['random_seed'], int) or not 0 < training['split']['random_seed'] >= 0:
+        raise ValueError('Error: `training.split.train_split` musi być liczbą całkowitą większą lub równą 0!')
+
+    # --------------- batch_size ---------------
+    if not isinstance(training['batch_size'], int) or training['batch_size'] <= 0:
+        raise ValueError('Error: `training.batch_size` musi być dodatnią liczbą całkowitą!')
+
+    # --------------- num_of_epochs ---------------
+    if not isinstance(training['num_of_epochs'], int) or training['num_of_epochs'] <= 0:
+        raise ValueError('Error: `training.num_of_epochs` musi być dodatnią liczbą całkowitą!')
 
     # --------------- early_stopping ---------------
     early_stopping = training['early_stopping']
@@ -295,7 +309,8 @@ def _check_training_section(training: dict[str, Any]) -> None:
             not isinstance(early_stopping['max_epochs_without_improvement'], int) or
             early_stopping['max_epochs_without_improvement'] <= 0
     ):
-        raise ValueError('Error: `training.early_stopping.max_epochs_without_improvement` musi być dodatnią liczbą całkowitą!')
+        raise ValueError(
+            'Error: `training.early_stopping.max_epochs_without_improvement` musi być dodatnią liczbą całkowitą!')
 
     if (
             not isinstance(early_stopping['min_improvement_delta'], (int, float)) or
@@ -303,9 +318,9 @@ def _check_training_section(training: dict[str, Any]) -> None:
     ):
         raise ValueError('Error: `training.early_stopping.min_improvement_delta` musi być >= 0!')
 
-    # --------------- num_of_workers ---------------
-    if not isinstance(training['num_of_workers'], int) or training['num_of_workers'] < 0:
-        raise ValueError('Error: `training.num_of_workers` musi być liczbą całkowitą >= 0!')
+    # --------------- learning_rate ---------------
+    if not isinstance(training['learning_rate'], (int, float)) or training['learning_rate'] <= 0:
+        raise ValueError('Error: `training.learning_rate` musi być > 0!')
 
     # --------------- device ---------------
     device = training['device']
@@ -314,6 +329,10 @@ def _check_training_section(training: dict[str, Any]) -> None:
 
     if device not in ('cpu', 'cuda', 'cuda:0'):
         raise ValueError('Error: `training.device` musi mieć wartość: `cpu`, `cuda` lub `cuda:0`!')
+
+    # --------------- num_of_workers ---------------
+    if not isinstance(training['num_of_workers'], int) or training['num_of_workers'] < 0:
+        raise ValueError('Error: `training.num_of_workers` musi być liczbą całkowitą >= 0!')
 
 
 def _check_checkpointing_section(checkpointing: dict[str, Any]) -> None:
@@ -367,7 +386,6 @@ def _check_cross_section_consistency(config: dict[str, Any]) -> None:
     model_output_type = config['model']['output']['type']
     training_quality_type = config['training']['quality_label']['type']
 
-    # Mapowanie: jaki typ wyjścia/etykiety treningowej pasuje do typu etykiety datasetu
     expected_output_type_by_dataset_label_type = {
         'mos': 'normalized_mos',
         'dmos': 'inverted_normalized_dmos',
@@ -386,7 +404,7 @@ def _check_cross_section_consistency(config: dict[str, Any]) -> None:
     if training_quality_type != expected_type:
         raise ValueError(
             f"Error: Niespójność: `dataset.quality_label.type` nie pasuje do `training.quality_label.type`!\n"
-            f"  dataset.quality_label.type   = {dataset_quality_type}\n"
+            f"  dataset.quality_label.type    = {dataset_quality_type}\n"
             f"  training.quality_label.type   = {training_quality_type}\n"
             f"  expected                      = {expected_type}"
         )
