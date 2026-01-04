@@ -51,22 +51,42 @@ def get_experiment_name_from_user() -> str:
     return input('\nPodaj nazwę nowego eksperymentu: ')
 
 
-def create_experiment(config_file_path, experiment_name: str):
+def create_experiment(
+        experiment_name: str,
+        config_file_path: Path | None = None,
+        checkpoint_file_path: Path | None = None
+) -> Path:
     if not EXPERIMENTS_PATH.parent.exists():
-        raise FileNotFoundError('Error: Brak folderu root projektu/aplikacji!\n'
-                                'Nie można utworzyć podfolderu `experiments`!')
+        raise FileNotFoundError('Error: Nie istnieje folder nadrzędny folderu `experiments`!')
+
+    if (
+        (config_file_path is None or
+         not config_file_path.exists())
+            and
+        (checkpoint_file_path is None or
+         not checkpoint_file_path.exists())
+    ):
+        raise FileNotFoundError('Error: Nie przekazano ani pliku konfiguracyjnego YAML ani pliku checkpointu z innego eksperymentu\n'
+                                'albo przekazany plik nie istnieje!')
+
+    if (config_file_path is not None and
+        checkpoint_file_path is not None):
+        raise ValueError('Error: Przekazano jednocześnie plik konfiguracyjny YAML oraz plik checkpointu!\n'
+                         'Można jednocześnie przekazać tylko jeden z argumentów!')
 
     EXPERIMENTS_PATH.mkdir(exist_ok=True)
+
+    if config_file_path is None or not config_file_path.exists():
+        config_file_path = checkpoint_file_path.parent.parent / 'config.yaml'
 
     with open(config_file_path, 'r') as config_file:
         config: dict[str, Any] = yaml.safe_load(config_file)
 
     dataset_name = config['dataset']['name']
 
-    experiment_name_path = EXPERIMENTS_PATH / f'{dataset_name}' / f'{experiment_name}/'
+    experiment_name_path = EXPERIMENTS_PATH / f"{dataset_name}" / f"{experiment_name}/"
 
     folders_to_create = [
-        experiment_name_path,
         experiment_name_path / 'checkpoints/',
         experiment_name_path / 'logs/',
         experiment_name_path / 'logs' / 'tensorboard/',
@@ -81,6 +101,8 @@ def create_experiment(config_file_path, experiment_name: str):
     ]
 
     try:
+        experiment_name_path.mkdir(parents=True, exist_ok=False)
+
         for folder in folders_to_create:
             folder.mkdir(parents=True, exist_ok=True)
 
@@ -89,12 +111,24 @@ def create_experiment(config_file_path, experiment_name: str):
 
         shutil.copy2(config_file_path, (experiment_name_path / 'config.yaml'))
 
-        generate_and_save_dataset_split(
-            dataset_length=config['dataset']['length'],
-            train_split=config['training']['split']['train_split'],
-            output_directory=(experiment_name_path / 'splits/'),
-            random_seed=config['training']['split']['random_seed']
-        )
+        if checkpoint_file_path is None:
+            generate_and_save_dataset_split(
+                dataset_length=config['dataset']['length'],
+                train_split=config['training']['split']['train_split'],
+                output_directory=(experiment_name_path / 'splits/'),
+                random_seed=config['training']['split']['random_seed']
+            )
+        else:
+            shutil.copytree(
+                src=checkpoint_file_path.parent.parent / 'splits/',
+                dst=experiment_name_path / 'splits/',
+                dirs_exist_ok=True,
+            )
+
+            shutil.copy2(checkpoint_file_path, (experiment_name_path / 'checkpoints' / 'init.pth'))
+            shutil.copy2(checkpoint_file_path, (experiment_name_path / 'summary.md'))
+
+        return experiment_name_path
     except FileExistsError:
         raise FileExistsError(
             f'Error: Eksperyment `{experiment_name}` dla datasetu `{dataset_name}` już istnieje!\n'

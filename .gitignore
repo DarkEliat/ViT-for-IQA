@@ -213,4 +213,6 @@ datasets/
 !src/datasets
 logs/
 **/logs/
+experiments/
+!experiments/.gitkeep
 *.tfevents*
