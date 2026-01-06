@@ -260,7 +260,7 @@ class Trainer:
 
         start_epoch = checkpoint['epoch'] + 1
 
-        print(f"[Trainer] Wczytano checkpoint z {checkpoint['epoch']}. epoki (kontynuacja od {start_epoch}). epoki...")
+        print(f"[Trainer] Wczytano checkpoint z {checkpoint['epoch']}. epoki (kontynuacja od {start_epoch}. epoki).")
 
         return start_epoch
 
@@ -382,3 +382,6 @@ class Trainer:
                                       train_loss=train_loss,
                                       validation_loss=validation_loss,
                                       save_triggers=save_checkpoint_triggers)
+
+        print('[Trainer] Trening zakończony!')
+        input('Naciśnij Enter, aby zakończyć...')

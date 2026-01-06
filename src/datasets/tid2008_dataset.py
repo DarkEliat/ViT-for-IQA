@@ -1,4 +1,15 @@
 from src.datasets.base_dataset import BaseDataset
+from src.utils.data_types import Label
 
 
-class Tid2008Dataset(BaseDataset): pass
+class Tid2008Dataset(BaseDataset):
+    def __init__(self, config): ...
+
+    def __len__(self): ...
+
+    def __getitem__(self, index): ...
+
+    @property
+    def labels(self): ...
+
+    def _get_label(self, index: int) -> Label: ...

@@ -17,6 +17,7 @@ dependencies = [
     # --- NUMPY / DATA PROCESSING ---
     "numpy",
     "pandas",
+    "scipy",
 
     # --- IMAGE PROCESSING ---
     "Pillow",
