@@ -56,5 +56,5 @@ class FileMap:
             )
 
 
-    def has_file_path(self, file_name: str) -> bool:
+    def has_file_name(self, file_name: str) -> bool:
         return file_name.lower() in self.file_map

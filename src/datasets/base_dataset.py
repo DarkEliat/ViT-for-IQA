@@ -1,6 +1,6 @@
 from abc import abstractmethod, ABC
 from pathlib import Path
-from typing import Any
+from typing import Any, Generic, TypeVar
 
 import torch
 from PIL import Image
@@ -13,7 +13,10 @@ from src.utils.image_preprocessing import resize
 from src.utils.paths import PROJECT_ROOT
 
 
-class BaseDataset(ABC, TorchDataset):
+LabelsContainerType = TypeVar('LabelsContainerType')
+
+
+class BaseDataset(ABC, TorchDataset, Generic[LabelsContainerType]):
     def __init__(self, config):
         self._config = config
 
@@ -35,6 +38,7 @@ class BaseDataset(ABC, TorchDataset):
         self._transform = transforms.Compose([
             transforms.ToTensor()
         ])
+
 
     def __getitem__(self, index):
         label = self._get_label(index)
@@ -66,13 +70,13 @@ class BaseDataset(ABC, TorchDataset):
         return reference_image, distorted_image, torch.tensor(quality_score, dtype=torch.float32)
 
 
-    @abstractmethod
-    def __len__(self): ...
+    def __len__(self):
+        return len(self.labels)
 
 
     @property
     @abstractmethod
-    def labels(self): ...
+    def labels(self) -> LabelsContainerType: ...
 
     @property
     def labels_path(self) -> Path:
@@ -110,6 +114,12 @@ class BaseDataset(ABC, TorchDataset):
     def transform(self) -> transforms.Compose:
         return self._transform
 
+
+    @abstractmethod
+    def _extract_reference_image_name(self, distorted_image_name: str) -> str: ...
+
+    @abstractmethod
+    def _build_labels(self) -> LabelsContainerType: ...
 
     @abstractmethod
     def _get_label(self, index: int) -> Label: ...

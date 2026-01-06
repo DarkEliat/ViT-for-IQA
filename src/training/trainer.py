@@ -1,30 +1,27 @@
-import shutil
 from pathlib import Path
-from typing import Any
 
 import torch
 import torch.nn as nn
-import yaml
 from torch import Tensor
 from torch.utils.data import DataLoader, Dataset, Subset
 from torch.optim import Adam, Optimizer
 from torch.utils.tensorboard import SummaryWriter
 
-from src.datasets.kadid10k_dataset import Kadid10kDataset
+from src.datasets.kadid_dataset import Kadid10kDataset
+from src.datasets.tid_dataset import Tid2008Dataset, Tid2013Dataset
 from src.datasets.live_dataset import LiveDataset
-from src.datasets.tid2008_dataset import Tid2008Dataset
-from src.datasets.tid2013_dataset import Tid2013Dataset
 from src.models.vit_regressor import VitRegressor
 from src.utils.config_consistency import check_consistency
 from src.utils.dataset_split import load_split_indices
-from src.utils.paths import EXPERIMENTS_PATH
-from scripts.create_experiment import create_experiment
 
 
 class Trainer:
     def __init__(self, experiment_path: Path) -> None:
         if not experiment_path.exists():
-            raise FileNotFoundError('Error: Wskazany eksperyment nie istnieje!')
+            raise FileNotFoundError(
+                f"Error: Wskazany eksperyment nie istnieje!"
+                f"Ścieżka: {experiment_path}"
+            )
 
         self.experiment_name = experiment_path.name
 
@@ -65,6 +62,13 @@ class Trainer:
             else None
         )
 
+        print(
+            f"[Trainer] Załadowano eksperyment:\n"
+            f"    Nazwa eksperymentu: `{self.experiment_name}`\n"
+            f"    Ścieżka eksperymentu: {self.experiment_path}\n"
+            f"    Nazwa configu: `{self.config['config_name']}`"
+        )
+
 
     def _build_dataset(self) -> Dataset:
         config = self.config
@@ -79,7 +83,7 @@ class Trainer:
             case 'live':
                 return LiveDataset(config=config)
             case _:
-                raise ValueError(f"Error: Niewspierany typ bazy danych: {config['dataset']['name']}!")
+                raise ValueError(f"Error: Niewspierany typ bazy danych: `{config['dataset']['name']}`!")
 
 
     def _create_dataloaders(self) -> tuple[DataLoader, DataLoader]:
@@ -210,10 +214,11 @@ class Trainer:
         """
         Zapisuje wagi modelu do pliku.
         """
+
         if all(value is False for value in save_triggers.values()):
-            print('WARNING: Nie przekazano żadnego powodu wykonania checkpointu!\n'
-                  'SPRAWDŹ POWÓD TEJ SYTUACJI! Checkpointy mogą być potencjalnie źle zapisywane!'
-                  'Aktualnie ustawiono domyślny powód: `save_last_epoch`.')
+            print('WARNING: [Trainer] Nie przekazano żadnego powodu wykonania checkpointu!\n'
+                  '    SPRAWDŹ POWÓD TEJ SYTUACJI! Checkpointy mogą być potencjalnie źle zapisywane!'
+                  '    Aktualnie ustawiono domyślny powód: `save_last_epoch`.')
 
             save_triggers['save_last_epoch'] = True
 
@@ -231,19 +236,19 @@ class Trainer:
             epoch_checkpoint_path = self.checkpoints_path / f"epoch_{epoch}.pth"
             torch.save(checkpoint, epoch_checkpoint_path)
 
-            print(f"{epoch_checkpoint_path}")
+            print(f"    {epoch_checkpoint_path}")
 
         if save_triggers['save_last_epoch']:
             last_checkpoint_path = self.checkpoints_path / 'last.pth'
             torch.save(checkpoint, last_checkpoint_path)
 
-            print(f"{last_checkpoint_path}")
+            print(f"    {last_checkpoint_path}")
 
         if save_triggers['save_best_epoch']:
             best_checkpoint_path = self.checkpoints_path / 'best.pth'
             torch.save(checkpoint, best_checkpoint_path)
 
-            print(f"{best_checkpoint_path}")
+            print(f"    {best_checkpoint_path}")
 
 
     def _load_checkpoint(self, checkpoint_path: Path) -> int:
@@ -260,7 +265,7 @@ class Trainer:
 
         start_epoch = checkpoint['epoch'] + 1
 
-        print(f"[Trainer] Wczytano checkpoint z {checkpoint['epoch']}. epoki (kontynuacja od {start_epoch}. epoki).")
+        print(f"\n[Trainer] Wczytano checkpoint z {checkpoint['epoch']}. epoki (kontynuacja od {start_epoch}. epoki).")
 
         return start_epoch
 
@@ -291,29 +296,29 @@ class Trainer:
 
         if last_checkpoint_exist and not self.config['checkpointing']['save_last_epoch']:
             print(
-                'WARNING: [Trainer] Znaleziono checkpoint `last.pth`.\n'
-                'Jednocześnie parametr konfiguracyjny `checkpointing.save_last_epoch` jest ustawiony na `false`.\n'
-                'Oznacza to, że przy aktualnej konfiguracji wskazany checkpoint nie mógł powstać.\n'
-                'Jeśli celowo umieściłeś plik `last.pth` w folderze `checkpoints\n'
-                'i jesteś pewien, że chcesz kontynuować trening, to wpisz [y / Y / t / T].\n'
-                'Jeśli nie chcesz kontynuować, to przerwij działanie programu albo wpisz [n / N].'
+                '\nWARNING: [Trainer] Znaleziono checkpoint `last.pth`.\n'
+                '    Jednocześnie parametr konfiguracyjny `checkpointing.save_last_epoch` jest ustawiony na `false`.\n'
+                '    Oznacza to, że przy aktualnej konfiguracji wskazany checkpoint nie mógł powstać.\n'
+                '    Jeśli celowo umieściłeś plik `last.pth` w folderze `checkpoints\n'
+                '    i jesteś pewien, że chcesz kontynuować trening, to wpisz [y / Y / t / T].\n'
+                '    Jeśli nie chcesz kontynuować, to przerwij działanie programu albo wpisz [n / N].'
             )
 
             checkpoint_to_load /= 'last.pth'
 
         elif last_checkpoint_exist:
             print(
-                'WARNING: [Trainer] Znaleziono checkpoint `last.pth`.\n'
-                'Jeśli jesteś pewien, że chcesz kontynuować trening, to wpisz [y / Y / t / T].\n'
-                'Jeśli nie chcesz kontynuować, to przerwij działanie programu albo wpisz [n / N].'
+                '\nWARNING: [Trainer] Znaleziono checkpoint `last.pth`.\n'
+                '    Jeśli jesteś pewien, że chcesz kontynuować trening, to wpisz [y / Y / t / T].\n'
+                '    Jeśli nie chcesz kontynuować, to przerwij działanie programu albo wpisz [n / N].'
             )
 
             checkpoint_to_load /= 'last.pth'
 
         elif best_checkpoint_exist or epoch_checkpoint_exist:
             print(
-                'WARNING: [Trainer] Znaleziono checkpoint(y) `epoch_*.pth` lub `best.pth`.\n'
-                'Jednocześnie nie znaleziono checkpointu `last.pth`, który umożliwiałby bezpieczne kontynuowanie treningu.'
+                '\nWARNING: [Trainer] Znaleziono checkpoint(y) `epoch_*.pth` lub `best.pth`.\n'
+                '    Jednocześnie nie znaleziono checkpointu `last.pth`, który umożliwiałby bezpieczne kontynuowanie treningu.'
             )
 
             input('Aby zapobiec utracie dotychczasowych wyników pracy w eksperymencie PRZERYWAM DZIAŁANIE PROGRAMU!\n'
@@ -322,11 +327,11 @@ class Trainer:
 
         elif init_checkpoint_exist:
             print(
-                'WARNING: [Trainer] Znaleziono checkpoint `init.pth`.\n'
-                'Jeśli stworzyłeś cały ten eksperyment na podstawie checkpointu z innego eksperymentu\n'
-                'albo celowo umieściłeś plik `init.pth` w folderze `checkpoints/ jako pretrenowany model`\n'
-                'i jesteś pewien, że chcesz kontynuować trening, to wpisz [y / Y / t / T].\n'
-                'Jeśli nie chcesz kontynuować, to przerwij działanie programu albo wpisz [n / N].'
+                '\nWARNING: [Trainer] Znaleziono checkpoint `init.pth`.\n'
+                '    Jeśli stworzyłeś cały ten eksperyment na podstawie checkpointu z innego eksperymentu\n'
+                '    albo celowo umieściłeś plik `init.pth` w folderze `checkpoints/ jako pretrenowany model`\n'
+                '    i jesteś pewien, że chcesz kontynuować trening, to wpisz [y / Y / t / T].\n'
+                '    Jeśli nie chcesz kontynuować, to przerwij działanie programu albo wpisz [n / N].'
             )
 
             checkpoint_to_load /= 'init.pth'
@@ -339,7 +344,7 @@ class Trainer:
                 if choice in ('y', 't'):
                     return self._load_checkpoint(checkpoint_path=checkpoint_to_load)
                 elif choice == 'n':
-                    input('PRZERYWAM DZIAŁANIE PROGRAMU! Naciśnij Enter')
+                    input('PRZERYWAM DZIAŁANIE PROGRAMU! Naciśnij Enter...')
                     exit(1)
                 else:
                     raise ValueError('Wpisano niepoprawną wartość! Spróbuj jeszcze raz!')
@@ -358,10 +363,10 @@ class Trainer:
         if epoch_from_checkpoint > 1:
             start_epoch = epoch_from_checkpoint
         else:
-            print(f"[Trainer] Startowanie treningu dla {num_of_epochs} epok...")
+            print(f"\n[Trainer] Startowanie treningu dla {num_of_epochs} epok...")
 
         for epoch in range(start_epoch, num_of_epochs+1):
-            print(f"[Trainer] Rozpoczęto trening {epoch}. epoki.")
+            print(f"\n[Trainer] Rozpoczęto trening {epoch}. epoki.")
 
             train_loss = self._train_one_epoch()
             validation_loss = self._validate_one_epoch()
@@ -371,9 +376,9 @@ class Trainer:
                 self.log_writer.add_scalar('loss/validation', validation_loss, epoch)
 
             print(
-                f"[Trainer] Epoka {epoch} / {num_of_epochs}  "
-                f"|  Błąd trenowania: {train_loss:.4f}  "
-                f"|  Błąd walidacji: {validation_loss:.4f}"
+                f"[Trainer] Ukończono trening epoki {epoch} / {num_of_epochs}    "
+                f"|    Błąd trenowania: {train_loss:.4f}    "
+                f"|    Błąd walidacji: {validation_loss:.4f}"
             )
 
             save_checkpoint_triggers = self.check_checkpoint_save_due(epoch=epoch)
@@ -383,5 +388,11 @@ class Trainer:
                                       validation_loss=validation_loss,
                                       save_triggers=save_checkpoint_triggers)
 
-        print('[Trainer] Trening zakończony!')
+        if start_epoch <= num_of_epochs:
+            print(f"\n[Trainer] Cały trening zakończony!\n"
+                  f"    Przeprowadzono {num_of_epochs} epok szkolenia.\n")
+        else:
+            print(f"\n[Trainer] Nie można przeprowadzić treningu, ponieważ numer startowej epoki ({start_epoch})\n"
+                  f"    jest większy niż maksymalna liczba epok treningu ({num_of_epochs}) w pliku konfiguracyjnym YAML eksperymentu.")
+
         input('Naciśnij Enter, aby zakończyć...')

@@ -1,5 +1,4 @@
 import os
-import shutil
 from pathlib import Path
 import shutil
 from typing import Any
@@ -28,7 +27,7 @@ def menu(config_files: list):
     if not config_files:
         raise FileNotFoundError('Error: Nie znaleziono żadnego pliku konfiguracyjnego! Dodaj plik .yaml do `config`!')
 
-    print('Tworzenie eksperymentu!\n'
+    print('Tworzenie eksperymentu...\n'
           'Wybierz dostępny plik konfiguracyjny na podstawie, którego szkolony będzie model:\n')
 
     for i, config_file in enumerate(config_files):
@@ -66,7 +65,7 @@ def create_experiment(
         (checkpoint_file_path is None or
          not checkpoint_file_path.exists())
     ):
-        raise FileNotFoundError('Error: Nie przekazano ani pliku konfiguracyjnego YAML ani pliku checkpointu z innego eksperymentu\n'
+        raise FileNotFoundError('Error: Nie przekazano pliku konfiguracyjnego YAML ani pliku checkpointu z innego eksperymentu\n'
                                 'albo przekazany plik nie istnieje!')
 
     if (config_file_path is not None and
@@ -127,6 +126,8 @@ def create_experiment(
 
             shutil.copy2(checkpoint_file_path, (experiment_name_path / 'checkpoints' / 'init.pth'))
             shutil.copy2(checkpoint_file_path, (experiment_name_path / 'summary.md'))
+
+            print(f"\nPoprawnie utworzono eksperyment `{experiment_name}`!")
 
         return experiment_name_path
     except FileExistsError:

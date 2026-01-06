@@ -1,5 +1,4 @@
 from PIL import Image
-import matplotlib.pyplot as plt
 
 
 def resize(image: Image.Image,
