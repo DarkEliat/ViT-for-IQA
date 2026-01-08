@@ -53,6 +53,7 @@ class Kadid10kDataset(BaseDataset[ pd.DataFrame ]):
             sep=r',',
             header=0
         )
+
         labels.columns = labels.columns.str.strip()
 
         labels.astype({
@@ -62,13 +63,6 @@ class Kadid10kDataset(BaseDataset[ pd.DataFrame ]):
             'var': float
         })
 
-        labels.columns = (
-            labels.columns
-            .str.strip()
-            .str.replace("\\\\", "/", regex=False)
-            .str.replace("\\", "/", regex=False)
-        )
-
         labels = labels.rename(
             columns={
                 'ref_img': 'reference_image_name',
@@ -76,6 +70,11 @@ class Kadid10kDataset(BaseDataset[ pd.DataFrame ]):
                 'dmos': 'quality_score'
             }
         )
+
+        for column_name in labels.select_dtypes(include='object').columns:
+            labels[column_name] = (labels[column_name].str.strip()
+                                                      .str.replace("\\\\", "/", regex=False)
+                                                      .str.replace("\\", "/", regex=False))
 
         if labels.isnull().any().any():
             raise ValueError(

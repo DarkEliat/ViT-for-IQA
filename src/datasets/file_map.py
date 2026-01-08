@@ -51,7 +51,7 @@ class FileMap:
             return self.file_map[file_name.lower()]
         except KeyError:
             raise FileNotFoundError(
-                f"Error: Nie odnaleziono obrazu {file_name}!\n"
+                f"Error: Nie odnaleziono obrazu `{file_name}`!\n"
                 f"Ścieżka: {self.files_directory_path}"
             )
 

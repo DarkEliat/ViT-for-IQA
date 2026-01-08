@@ -54,9 +54,6 @@ class Trainer:
             lr=config['training']['learning_rate']
         )
 
-        # Dataloadery
-        self.train_loader, self.validation_loader = self._build_dataloaders()
-
         # Logowanie
         self.log_writer = (
             SummaryWriter(str(self.logs_tensorboard_path))
@@ -70,6 +67,9 @@ class Trainer:
             f"    Ścieżka eksperymentu: {self.experiment_path}\n"
             f"    Nazwa configu: `{self.config['config_name']}`"
         )
+
+        # Dataloadery
+        self.train_loader, self.validation_loader = self._build_dataloaders()
 
 
     def _build_dataloaders(self) -> tuple[DataLoader, DataLoader]:
@@ -88,6 +88,11 @@ class Trainer:
                 f"{validation_indices_path}\n"
                 f"Upewnij się, że eksperyment został poprawnie utworzony."
             )
+
+        print(
+            f"\n[Trainer] Ładowanie datasetu `{self.dataset_name}` w celu szkolenia modelu ViT...\n"
+            f"    To może potrwać nawet do kilku minut..."
+        )
 
         config = self.config
 
