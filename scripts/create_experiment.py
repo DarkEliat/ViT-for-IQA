@@ -5,16 +5,17 @@ from typing import Any
 
 import yaml
 
-from src.utils.config_consistency import check_consistency
+from src.utils.configs import check_config_consistency, load_config
+from src.utils.data_types import Config
 from src.utils.paths import CONFIGS_PATH, EXPERIMENTS_PATH
-from src.utils.dataset_split import generate_and_save_dataset_split
+from src.utils.dataset_splits import generate_and_save_dataset_split
 
 
 def clear_screen():
     os.system('cls' if os.name == 'nt' else 'clear')
 
 
-def get_config_files():
+def get_global_config_paths() -> list[Path]:
     if not CONFIGS_PATH.exists() or not CONFIGS_PATH.is_dir():
         raise FileNotFoundError('Error: Folder `configs` z plikami konfiguracyjnymi nie istnieje!')
 
@@ -23,7 +24,7 @@ def get_config_files():
     return sorted(config_files)
 
 
-def menu(config_files: list):
+def menu(config_files: list[Path]) -> Path:
     if not config_files:
         raise FileNotFoundError('Error: Nie znaleziono żadnego pliku konfiguracyjnego! Dodaj plik .yaml do `config`!')
 
@@ -52,55 +53,55 @@ def get_experiment_name_from_user() -> str:
 
 def create_experiment(
         experiment_name: str,
-        config_file_path: Path | None = None,
-        checkpoint_file_path: Path | None = None
+        config_path: Path | None = None,
+        checkpoint_path: Path | None = None
 ) -> Path:
     if not EXPERIMENTS_PATH.parent.exists():
         raise FileNotFoundError('Error: Nie istnieje folder nadrzędny folderu `experiments`!')
 
     if (
-        (config_file_path is None or
-         not config_file_path.exists())
+        (config_path is None or
+         not config_path.exists())
             and
-        (checkpoint_file_path is None or
-         not checkpoint_file_path.exists())
+        (checkpoint_path is None or
+         not checkpoint_path.exists())
     ):
         raise FileNotFoundError('Error: Nie przekazano pliku konfiguracyjnego YAML ani pliku checkpointu z innego eksperymentu\n'
                                 'albo przekazany plik nie istnieje!')
 
-    if (config_file_path is not None and
-        checkpoint_file_path is not None):
+    if (config_path is not None and
+        checkpoint_path is not None):
         raise ValueError('Error: Przekazano jednocześnie plik konfiguracyjny YAML oraz plik checkpointu!\n'
                          'Można jednocześnie przekazać tylko jeden z argumentów!')
 
     EXPERIMENTS_PATH.mkdir(exist_ok=True)
 
-    if config_file_path is None or not config_file_path.exists():
-        config_file_path = checkpoint_file_path.parent.parent / 'config.yaml'
+    if config_path is None or not config_path.exists():
+        config_path = checkpoint_path.parent.parent / 'config.yaml'
 
-    with open(config_file_path, 'r') as config_file:
-        config: dict[str, Any] = yaml.safe_load(config_file)
+    with open(config_path, 'r') as config_file:
+        config: Config = yaml.safe_load(config_file)
 
     dataset_name = config['dataset']['name']
 
-    experiment_name_path = EXPERIMENTS_PATH / f"{dataset_name}" / f"{experiment_name}/"
+    experiment_path = EXPERIMENTS_PATH / f"{dataset_name}" / f"{experiment_name}/"
 
     folders_to_create = [
-        experiment_name_path / 'checkpoints/',
-        experiment_name_path / 'logs/',
-        experiment_name_path / 'logs' / 'tensorboard/',
-        experiment_name_path / 'splits/'
+        experiment_path / 'checkpoints/',
+        experiment_path / 'logs/',
+        experiment_path / 'logs' / 'tensorboard/',
+        experiment_path / 'splits/'
     ]
 
     empty_files_to_create = [
-        experiment_name_path / 'logs' / 'train.log',
-        experiment_name_path / 'metrics.csv',
-        experiment_name_path / 'metrics.json',
-        experiment_name_path / 'summary.md'
+        experiment_path / 'logs' / 'train.log',
+        experiment_path / 'metrics.csv',
+        experiment_path / 'metrics.json',
+        experiment_path / 'summary.md'
     ]
 
     try:
-        experiment_name_path.mkdir(parents=True, exist_ok=False)
+        experiment_path.mkdir(parents=True, exist_ok=False)
 
         for folder in folders_to_create:
             folder.mkdir(parents=True, exist_ok=True)
@@ -108,28 +109,28 @@ def create_experiment(
         for file in empty_files_to_create:
             file.touch(exist_ok=False)
 
-        shutil.copy2(config_file_path, (experiment_name_path / 'config.yaml'))
+        shutil.copy2(config_path, (experiment_path / 'config.yaml'))
 
-        if checkpoint_file_path is None:
+        if checkpoint_path is None:
             generate_and_save_dataset_split(
                 dataset_length=config['dataset']['length'],
                 train_split=config['training']['split']['train_split'],
-                output_directory=(experiment_name_path / 'splits/'),
+                output_directory=(experiment_path / 'splits/'),
                 random_seed=config['training']['split']['random_seed']
             )
         else:
             shutil.copytree(
-                src=checkpoint_file_path.parent.parent / 'splits/',
-                dst=experiment_name_path / 'splits/',
+                src=checkpoint_path.parent.parent / 'splits/',
+                dst=experiment_path / 'splits/',
                 dirs_exist_ok=True,
             )
 
-            shutil.copy2(checkpoint_file_path, (experiment_name_path / 'checkpoints' / 'init.pth'))
-            shutil.copy2(checkpoint_file_path, (experiment_name_path / 'summary.md'))
+            shutil.copy2(checkpoint_path, (experiment_path / 'checkpoints' / 'init.pth'))
+            shutil.copy2(checkpoint_path, (experiment_path / 'summary.md'))
 
             print(f"\nPoprawnie utworzono eksperyment `{experiment_name}`!")
 
-        return experiment_name_path
+        return experiment_path
     except FileExistsError:
         raise FileExistsError(
             f'Error: Eksperyment `{experiment_name}` dla datasetu `{dataset_name}` już istnieje!\n'
@@ -145,16 +146,14 @@ def create_experiment(
             f'Błąd: {error}'
         )
     finally:
-        print(f'Ścieżka: {experiment_name_path}\n')
+        print(f'Ścieżka: {experiment_path}\n')
 
 
 if __name__ == '__main__':
-    all_config_files = get_config_files()
+    all_global_config_paths = get_global_config_paths()
 
-    chosen_config_file = menu(config_files=all_config_files)
-
-    check_consistency(config_file_path=chosen_config_file)
+    chosen_config_path = menu(config_files=all_global_config_paths)
 
     experiment_name = get_experiment_name_from_user()
 
-    create_experiment(config_file_path=chosen_config_file, experiment_name=experiment_name)
+    create_experiment(config_path=chosen_config_path, experiment_name=experiment_name)

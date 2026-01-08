@@ -17,8 +17,8 @@ class VitRegressor(nn.Module):
     """
 
     def __init__(self,
-                 model_name: str = 'vit_base_patch16_224',
-                 embedding_dimension: int = 768) -> None:
+                 model_name: str,
+                 embedding_dimension: int) -> None:
         super().__init__()
 
         # Tworzenie modelu ViT z bibliotekami timm.

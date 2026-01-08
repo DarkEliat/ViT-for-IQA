@@ -8,7 +8,7 @@ from src.utils.paths import (EXPERIMENTS_KADID10K_PATH,
 def main() -> None:
     print('Ładuję dataset do szkolenia modelu ViT... Proszę poczekaj chwilę...\n')
 
-    trainer = Trainer(experiment_path=(EXPERIMENTS_TID2013_PATH / 'test'))
+    trainer = Trainer(experiment_path=(EXPERIMENTS_TID2008_PATH / 'test'))
     trainer.train()
 
 

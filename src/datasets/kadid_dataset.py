@@ -1,7 +1,8 @@
 import pandas as pd
 
 from src.datasets.base_dataset import BaseDataset
-from src.utils.data_types import Label, QualityScore
+from src.utils.data_types import Label, QualityScore, UnifiedQualityScore
+from src.utils.quality_scores import dmos_to_quality_score
 
 
 class Kadid10kDataset(BaseDataset[ pd.DataFrame ]):
@@ -14,6 +15,21 @@ class Kadid10kDataset(BaseDataset[ pd.DataFrame ]):
     @property
     def labels(self) -> pd.DataFrame:
         return self._labels
+
+
+    def _unify_quality_score(self, value: float) -> UnifiedQualityScore:
+        quality_label_type = self.config['dataset']['quality_label']['type']
+        if quality_label_type != 'dmos':
+            raise TypeError(
+                'Error: Nie można konwertować wskaźnika DMOS na zdefiniowane globalnie `UnifiedQualityScore`,'
+                '    ponieważ plik konfiguracyjny YAML wskazuje inny typ wskaźnika jakości niż `dmos`!'
+            )
+
+        dmos_min = self.config['dataset']['quality_label']['min']
+        dmos_max = self.config['dataset']['quality_label']['max']
+
+        return dmos_to_quality_score(dmos_value=value, dmos_min=dmos_min, dmos_max=dmos_max)
+
 
 
     def _extract_reference_image_name(self, distorted_image_name: str) -> str:
@@ -78,6 +94,8 @@ class Kadid10kDataset(BaseDataset[ pd.DataFrame ]):
             distorted_image_name=label['distorted_image_name'],
             quality_score=QualityScore(
                 type='dmos',
+                min_value=self.config['dataset']['quality_label']['min'],
+                max_value=self.config['dataset']['quality_label']['max'],
                 value=label['quality_score'],
                 normalized=False,
                 model_target=False

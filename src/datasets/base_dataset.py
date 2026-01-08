@@ -8,7 +8,7 @@ from torch.utils.data import Dataset as TorchDataset
 from torchvision import transforms
 
 from src.datasets.file_map import FileMap
-from src.utils.data_types import Label
+from src.utils.data_types import Label, Config, UnifiedQualityScore
 from src.utils.image_preprocessing import resize
 from src.utils.paths import PROJECT_ROOT
 
@@ -45,7 +45,9 @@ class BaseDataset(ABC, TorchDataset, Generic[LabelsContainerType]):
 
         reference_image_name = label['reference_image_name']
         distorted_image_name = label['distorted_image_name']
-        quality_score = label["quality_score"]['value']
+        quality_score_value = label['quality_score']['value']
+
+        quality_score_value = self._unify_quality_score(value=quality_score_value).value
 
         reference_image_path = self.reference_images_map.get_file_path(reference_image_name)
         distorted_image_path = self.distorted_images_map.get_file_path(distorted_image_name)
@@ -67,7 +69,7 @@ class BaseDataset(ABC, TorchDataset, Generic[LabelsContainerType]):
         reference_image = self.transform(reference_image)
         distorted_image = self.transform(distorted_image)
 
-        return reference_image, distorted_image, torch.tensor(quality_score, dtype=torch.float32)
+        return reference_image, distorted_image, torch.tensor(quality_score_value, dtype=torch.float32)
 
 
     def __len__(self):
@@ -83,7 +85,7 @@ class BaseDataset(ABC, TorchDataset, Generic[LabelsContainerType]):
         return self._labels_path
 
     @property
-    def config(self) -> dict[str, Any]:
+    def config(self) -> Config:
         return self._config
 
     @property
@@ -114,6 +116,9 @@ class BaseDataset(ABC, TorchDataset, Generic[LabelsContainerType]):
     def transform(self) -> transforms.Compose:
         return self._transform
 
+
+    @abstractmethod
+    def _unify_quality_score(self, value: float) -> UnifiedQualityScore: ...
 
     @abstractmethod
     def _extract_reference_image_name(self, distorted_image_name: str) -> str: ...

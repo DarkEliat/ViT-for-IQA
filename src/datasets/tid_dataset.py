@@ -1,7 +1,8 @@
 import pandas as pd
 
 from src.datasets.base_dataset import BaseDataset
-from src.utils.data_types import Label, QualityScore
+from src.utils.data_types import Label, QualityScore, UnifiedQualityScore
+from src.utils.quality_scores import normalize_min_max
 
 
 class TidDataset(BaseDataset[ pd.DataFrame ]):
@@ -14,6 +15,22 @@ class TidDataset(BaseDataset[ pd.DataFrame ]):
     @property
     def labels(self) -> pd.DataFrame:
         return self._labels
+
+
+    def _unify_quality_score(self, value: float) -> UnifiedQualityScore:
+        quality_label_type = self.config['dataset']['quality_label']['type']
+        if quality_label_type != 'mos':
+            raise TypeError(
+                'Error: Nie można konwertować wskaźnika MOS na zdefiniowane globalnie `UnifiedQualityScore`,'
+                '    ponieważ plik konfiguracyjny YAML wskazuje inny typ wskaźnika jakości niż `mos`!'
+            )
+
+        mos_min = self.config['dataset']['quality_label']['min']
+        mos_max = self.config['dataset']['quality_label']['max']
+
+        normalized_mos = normalize_min_max(score_value=value, score_min=mos_min, score_max=mos_max)
+
+        return UnifiedQualityScore(value=normalized_mos)
 
 
     def _extract_reference_image_name(self, distorted_image_name: str) -> str:
@@ -70,6 +87,8 @@ class TidDataset(BaseDataset[ pd.DataFrame ]):
             distorted_image_name=label['distorted_image_name'],
             quality_score=QualityScore(
                 type='mos',
+                min_value=self.config['dataset']['quality_label']['min'],
+                max_value=self.config['dataset']['quality_label']['max'],
                 value=label['quality_score'],
                 normalized=False,
                 model_target=False

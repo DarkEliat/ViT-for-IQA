@@ -3,29 +3,40 @@ from typing import Any
 
 import yaml
 
+from src.utils.data_types import Config
 from src.utils.paths import PROJECT_ROOT
 
 
-def _load_config(config_file_path: Path) -> dict[str, Any]:
-    if not config_file_path.exists():
+def load_config(config_path: Path, check_consistency: bool) -> Config:
+    if not config_path.exists():
         raise FileNotFoundError(
             f"Error: Plik konfiguracyjny nie istnieje!\n"
-            f"Ścieżka: {config_file_path}"
+            f"Ścieżka: {config_path}"
         )
 
-    if config_file_path.suffix not in {'.yaml', '.yml'}:
-        raise ValueError('Error: Nieprawidłowy format pliku konfiguracyjnego! Oczekiwano pliku YAML (.yaml / .yml).')
+    if config_path.suffix not in {'.yaml', '.yml'}:
+        raise ValueError(
+            f"Error: Nieprawidłowy format pliku konfiguracyjnego! Oczekiwano pliku YAML (.yaml / .yml)!\n"
+            f"Ścieżka: {config_path}"
 
-    with open(config_file_path, 'r', encoding='utf-8') as file_handle:
-        loaded_config = yaml.safe_load(file_handle)
+        )
 
-    if not isinstance(loaded_config, dict):
-        raise TypeError('Error: Nieprawidłowa struktura pliku YAML! Oczekiwano słownika (dict) na najwyższym poziomie.')
+    with open(config_path, 'r', encoding='utf-8') as config_file:
+        config = yaml.safe_load(config_file)
 
-    return loaded_config
+    if not isinstance(config, dict):
+        raise TypeError(
+            f"Error: Nieprawidłowa struktura pliku YAML! Oczekiwano słownika (dict) na najwyższym poziomie!\n"
+            f"Ścieżka: {config_path}"
+        )
+
+    if check_consistency:
+        check_config_consistency(config=config, path=config_path)
+
+    return config
 
 
-def _get_section(config: dict[str, Any], section_key: str) -> dict[str, Any]:
+def _get_section(config: Config, section_key: str) -> dict[str, Any]:
     if section_key not in config:
         raise ValueError(f"Error: Brakuje wymaganej sekcji `{section_key}` na najwyższym poziomie!")
 
@@ -224,10 +235,7 @@ def _check_model_section(model: dict[str, Any]) -> None:
         raise ValueError('Error: Zakres `model.output` musi wynosić dokładnie [0, 1]!')
 
     if output_config['type'] not in ('normalized_mos', 'inverted_normalized_dmos'):
-        raise ValueError(
-            'Error: `model.output.type` musi mieć wartość `normalized_mos` '
-            'albo `inverted_normalized_dmos`!'
-        )
+        raise ValueError('Error: `model.output.type` musi mieć wartość `normalized_mos` albo `inverted_normalized_dmos`!')
 
 
 def _check_training_section(training: dict[str, Any]) -> None:
@@ -410,10 +418,8 @@ def _check_cross_section_consistency(config: dict[str, Any]) -> None:
         )
 
 
-def check_consistency(config_file_path: Path) -> dict[str, Any]:
+def check_config_consistency(config: Config, path: Path | None = None) -> None:
     try:
-        config = _load_config(config_file_path)
-
         dataset_config = _get_section(config, section_key='dataset')
         model_config = _get_section(config, section_key='model')
         training_config = _get_section(config, section_key='training')
@@ -427,11 +433,9 @@ def check_consistency(config_file_path: Path) -> dict[str, Any]:
         _check_logging_section(logging_config)
         _check_cross_section_consistency(config)
 
-        return config
-
     except Exception as error:
         raise RuntimeError(
             f"Error: Błąd weryfikacji spójności pliku konfiguracyjnego YAML!\n"
-            f"Ścieżka: {config_file_path}\n\n"
+            f"Ścieżka: {path if path else 'NIEZNANA'}\n\n"
             f"{error}"
         ) from error

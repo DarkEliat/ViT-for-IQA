@@ -11,8 +11,10 @@ from src.datasets.kadid_dataset import Kadid10kDataset
 from src.datasets.tid_dataset import Tid2008Dataset, Tid2013Dataset
 from src.datasets.live_dataset import LiveDataset
 from src.models.vit_regressor import VitRegressor
-from src.utils.config_consistency import check_consistency
-from src.utils.dataset_split import load_split_indices
+from src.utils.checkpoints import load_checkpoint_pickle
+from src.utils.configs import load_config, check_config_consistency
+from src.utils.dataset_splits import load_split_indices
+from src.utils.datasets import build_dataset
 
 
 class Trainer:
@@ -31,8 +33,8 @@ class Trainer:
         self.logs_tensorboard_path = self.logs_path / 'tensorboard/'
         self.splits_path = experiment_path / 'splits/'
 
-        config_file_path = experiment_path / 'config.yaml'
-        config = check_consistency(config_file_path=config_file_path)
+        config_path = experiment_path / 'config.yaml'
+        config = load_config(config_path=config_path, check_consistency=True)
         self.config = config
 
         self.dataset_name = config['dataset']['name']
@@ -53,7 +55,7 @@ class Trainer:
         )
 
         # Dataloadery
-        self.train_loader, self.validation_loader = self._create_dataloaders()
+        self.train_loader, self.validation_loader = self._build_dataloaders()
 
         # Logowanie
         self.log_writer = (
@@ -70,23 +72,7 @@ class Trainer:
         )
 
 
-    def _build_dataset(self) -> Dataset:
-        config = self.config
-
-        match config['dataset']['name']:
-            case 'kadid10k':
-                return Kadid10kDataset(config=config)
-            case 'tid2008':
-                return Tid2008Dataset(config=config)
-            case 'tid2013':
-                return Tid2013Dataset(config=config)
-            case 'live':
-                return LiveDataset(config=config)
-            case _:
-                raise ValueError(f"Error: Niewspierany typ bazy danych: `{config['dataset']['name']}`!")
-
-
-    def _create_dataloaders(self) -> tuple[DataLoader, DataLoader]:
+    def _build_dataloaders(self) -> tuple[DataLoader, DataLoader]:
         """
         Tworzy dataloadery do treningu i walidacji dla wybranej bazy danych.
         """
@@ -108,7 +94,7 @@ class Trainer:
         train_indices = load_split_indices(file_path=train_indices_path)
         validation_indices = load_split_indices(file_path=validation_indices_path)
 
-        dataset: Dataset = self._build_dataset()
+        dataset: Dataset = build_dataset(config=config)
         train_dataset = Subset(dataset, train_indices)
         validation_dataset = Subset(dataset, validation_indices)
 
@@ -139,15 +125,15 @@ class Trainer:
         running_loss = 0.0
         batch_count = 0
 
-        for reference_image, distorted_image, dmos_value in self.train_loader:
-            reference_image = reference_image.to(self.device)
-            distorted_image = distorted_image.to(self.device)
-            dmos_value = dmos_value.to(self.device)
+        for distorted_image_tensor, distorted_image_tensor, dmos_value_tensor in self.train_loader:
+            distorted_image_tensor = distorted_image_tensor.to(self.device)
+            distorted_image_tensor = distorted_image_tensor.to(self.device)
+            dmos_value_tensor = dmos_value_tensor.to(self.device)
 
             self.optimizer.zero_grad()
 
-            prediction: Tensor = self.model(reference_image, distorted_image)
-            loss: Tensor =  self.loss_function(prediction, dmos_value)
+            prediction: Tensor = self.model(distorted_image_tensor, distorted_image_tensor)
+            loss: Tensor =  self.loss_function(prediction, dmos_value_tensor)
 
             loss.backward()
             self.optimizer.step()
@@ -252,13 +238,11 @@ class Trainer:
 
 
     def _load_checkpoint(self, checkpoint_path: Path) -> int:
-        if not checkpoint_path.exists():
-            raise FileNotFoundError(
-                f"Error: Nie znaleziono wskazanego checkpointu!\n"
-                f"Ścieżka: {checkpoint_path}"
-            )
-
-        checkpoint = torch.load(checkpoint_path, map_location=self.device)
+        checkpoint = load_checkpoint_pickle(
+            checkpoint_path=checkpoint_path,
+            device=self.device,
+            check_consistency=True
+        )
 
         self.model.load_state_dict(checkpoint['model_state_dict'])
         self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
@@ -270,7 +254,7 @@ class Trainer:
         return start_epoch
 
 
-    def checkpoints_exist(self):
+    def any_checkpoint_exists(self):
         if not self.checkpoints_path.exists() or not self.checkpoints_path.is_dir():
             raise FileNotFoundError(
                 f"Error: Nie istnieje folder checkpointów"
@@ -281,7 +265,7 @@ class Trainer:
 
 
     def _try_resume(self) -> int:
-        if not self.checkpoints_exist():
+        if not self.any_checkpoint_exists():
             return 0
 
         last_checkpoint_exist = any(self.checkpoints_path.glob('last.pth'))
