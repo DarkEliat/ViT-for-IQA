@@ -1,12 +1,13 @@
 from torch.utils.data import Dataset as TorchDataset
 
+from src.datasets.base_dataset import BaseDataset
 from src.datasets.kadid_dataset import Kadid10kDataset
 from src.datasets.live_dataset import LiveDataset
 from src.datasets.tid_dataset import Tid2008Dataset, Tid2013Dataset
 from src.utils.data_types import Config
 
 
-def build_dataset(config: Config) -> TorchDataset:
+def build_dataset(config: Config) -> TorchDataset | BaseDataset:
     match config['dataset']['name']:
         case 'kadid10k':
             return Kadid10kDataset(config=config)

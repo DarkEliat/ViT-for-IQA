@@ -9,12 +9,12 @@ class Kadid10kDataset(BaseDataset[ pd.DataFrame ]):
     def __init__(self, config):
         super().__init__(config=config)
 
-        self._labels = self._build_labels()
+        self._labels_container = self._build_labels_container()
 
 
     @property
-    def labels(self) -> pd.DataFrame:
-        return self._labels
+    def labels_container(self) -> pd.DataFrame:
+        return self._labels_container
 
 
     def _unify_quality_score(self, value: float) -> UnifiedQualityScore:
@@ -32,9 +32,9 @@ class Kadid10kDataset(BaseDataset[ pd.DataFrame ]):
 
 
 
-    def _extract_reference_image_name(self, distorted_image_name: str) -> str:
-        matches = self.labels.loc[
-            self.labels['distorted_image_name'] == distorted_image_name,
+    def get_reference_image_name(self, distorted_image_name: str) -> str:
+        matches = self.labels_container.loc[
+            self.labels_container['distorted_image_name'] == distorted_image_name,
             'reference_image_name'
         ]
 
@@ -47,23 +47,27 @@ class Kadid10kDataset(BaseDataset[ pd.DataFrame ]):
         return matches.iloc[0]
 
 
-    def _build_labels(self) -> pd.DataFrame:
-        labels = pd.read_csv(
+    def get_reference_image_names_per_distorted_image(self) -> list[str]:
+        return self.labels_container['reference_image_name'].astype(str).tolist()
+
+
+    def _build_labels_container(self) -> pd.DataFrame:
+        labels_container = pd.read_csv(
             self.labels_path,
             sep=r',',
             header=0
         )
 
-        labels.columns = labels.columns.str.strip()
+        labels_container.columns = labels_container.columns.str.strip()
 
-        labels.astype({
+        labels_container.astype({
             'dist_img': str,
             'ref_img': str,
             'dmos': float,
             'var': float
         })
 
-        labels = labels.rename(
+        labels_container = labels_container.rename(
             columns={
                 'ref_img': 'reference_image_name',
                 'dist_img': 'distorted_image_name',
@@ -71,22 +75,22 @@ class Kadid10kDataset(BaseDataset[ pd.DataFrame ]):
             }
         )
 
-        for column_name in labels.select_dtypes(include='object').columns:
-            labels[column_name] = (labels[column_name].str.strip()
+        for column_name in labels_container.select_dtypes(include='object').columns:
+            labels_container[column_name] = (labels_container[column_name].str.strip()
                                                       .str.replace("\\\\", "/", regex=False)
                                                       .str.replace("\\", "/", regex=False))
 
-        if labels.isnull().any().any():
+        if labels_container.isnull().any().any():
             raise ValueError(
                 f"Error: Plik z etykietami zawiera puste wartości po czyszczeniu!"
                 f"Ścieżka: {self.labels_path}"
             )
 
-        return labels
+        return labels_container
 
 
-    def _get_label(self, index: int) -> Label:
-        label = self.labels.iloc[index]
+    def get_label(self, index: int) -> Label:
+        label = self.labels_container.iloc[index]
 
         return Label(
             reference_image_name=label['reference_image_name'],

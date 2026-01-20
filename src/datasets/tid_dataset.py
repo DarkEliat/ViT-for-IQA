@@ -9,12 +9,12 @@ class TidDataset(BaseDataset[ pd.DataFrame ]):
     def __init__(self, config):
         super().__init__(config=config)
 
-        self._labels = self._build_labels()
+        self._labels_container = self._build_labels_container()
 
 
     @property
-    def labels(self) -> pd.DataFrame:
-        return self._labels
+    def labels_container(self) -> pd.DataFrame:
+        return self._labels_container
 
 
     def _unify_quality_score(self, value: float) -> UnifiedQualityScore:
@@ -33,7 +33,7 @@ class TidDataset(BaseDataset[ pd.DataFrame ]):
         return UnifiedQualityScore(value=normalized_mos)
 
 
-    def _extract_reference_image_name(self, distorted_image_name: str) -> str:
+    def get_reference_image_name(self, distorted_image_name: str) -> str:
         reference_prefix = distorted_image_name.split(sep='_', maxsplit=1)[0]
 
         reference_image_name = f"{reference_prefix}.bmp"
@@ -47,8 +47,12 @@ class TidDataset(BaseDataset[ pd.DataFrame ]):
         return reference_image_name
 
 
-    def _build_labels(self) -> pd.DataFrame:
-        labels: pd.DataFrame = pd.read_csv(
+    def get_reference_image_names_per_distorted_image(self) -> list[str]:
+        return self.labels_container['reference_image_name'].astype(str).tolist()
+
+
+    def _build_labels_container(self) -> pd.DataFrame:
+        labels_container: pd.DataFrame = pd.read_csv(
             self.labels_path,
             sep=r'\s+',  # Dowolna liczba białych znaków jako separator kolumn
             header=None,
@@ -58,29 +62,29 @@ class TidDataset(BaseDataset[ pd.DataFrame ]):
                 'distorted_image_name': str
             }
         )
-        labels.columns = labels.columns.str.strip()
+        labels_container.columns = labels_container.columns.str.strip()
 
-        for column_name in labels.select_dtypes(include='object').columns:
-            labels[column_name] = (labels[column_name].str.strip()
+        for column_name in labels_container.select_dtypes(include='object').columns:
+            labels_container[column_name] = (labels_container[column_name].str.strip()
                                          .str.replace("\\\\", "/", regex=False)
                                          .str.replace("\\", "/", regex=False))
 
-        if labels.isnull().any().any():
+        if labels_container.isnull().any().any():
             raise ValueError(
                 f"Error: Plik z etykietami zawiera puste wartości po czyszczeniu!"
                 f"Ścieżka: {self.labels_path}"
             )
 
-        labels['reference_image_name'] = (
-            labels['distorted_image_name']
-            .apply(self._extract_reference_image_name)
+        labels_container['reference_image_name'] = (
+            labels_container['distorted_image_name']
+            .apply(self.get_reference_image_name)
         )
 
-        return labels
+        return labels_container
 
 
-    def _get_label(self, index: int) -> Label:
-        label = self.labels.iloc[index]
+    def get_label(self, index: int) -> Label:
+        label = self.labels_container.iloc[index]
 
         return Label(
             reference_image_name=label['reference_image_name'],

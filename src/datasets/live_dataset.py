@@ -12,12 +12,12 @@ class LiveDataset(BaseDataset[ list[dict[str, Any]] ]):
     def __init__(self, config):
         super().__init__(config=config)
 
-        self._labels = self._build_labels()
+        self._labels_container = self._build_labels_container()
 
 
     @property
-    def labels(self) -> list[dict[str, Any]]:
-        return self._labels
+    def labels_container(self) -> list[dict[str, Any]]:
+        return self._labels_container
 
 
     def _unify_quality_score(self, value: float) -> UnifiedQualityScore:
@@ -46,7 +46,7 @@ class LiveDataset(BaseDataset[ list[dict[str, Any]] ]):
             )
 
 
-    def _extract_reference_image_name(self, distorted_image_name: str) -> str:
+    def get_reference_image_name(self, distorted_image_name: str) -> str:
         reference_prefix = distorted_image_name.split(sep='_', maxsplit=1)[0]
         candidate_reference_image_names = [
             f"{reference_prefix}.jpg",
@@ -72,7 +72,14 @@ class LiveDataset(BaseDataset[ list[dict[str, Any]] ]):
         return reference_image_name
 
 
-    def _build_labels(self) -> list[dict[str, Any]]:
+    def get_reference_image_names_per_distorted_image(self) -> list[str]:
+        return [
+            str(label_dict['reference_image_name'])
+            for label_dict in self.labels_container
+        ]
+
+
+    def _build_labels_container(self) -> list[dict[str, Any]]:
         matlab_data = loadmat(str(self.labels_path))
 
         self._check_label_file_keys(matlab_data=matlab_data)
@@ -81,7 +88,7 @@ class LiveDataset(BaseDataset[ list[dict[str, Any]] ]):
         image_list = matlab_data['image_list'].squeeze()
         mos_values = matlab_data['MOS'].squeeze()
 
-        labels: list[dict[str, Any]] = []
+        labels_container: list[dict[str, Any]] = []
 
         for image_name, mos_value in zip(image_list, mos_values):
             distorted_image_name = str(image_name[0])
@@ -90,25 +97,25 @@ class LiveDataset(BaseDataset[ list[dict[str, Any]] ]):
             if '_' not in distorted_image_name:
                 continue
 
-            reference_image_name = self._extract_reference_image_name(distorted_image_name=distorted_image_name)
+            reference_image_name = self.get_reference_image_name(distorted_image_name=distorted_image_name)
 
-            labels.append({
+            labels_container.append({
                 'reference_image_name': reference_image_name,
                 'distorted_image_name': distorted_image_name,
                 'quality_score': float(mos_value),
             })
 
-            if not labels:
-                raise ValueError(
-                    f"Error: Nie znaleziono żadnych etykiet!"
-                    f"Ścieżka: {self.labels_path}"
-                )
+        if not labels_container:
+            raise ValueError(
+                f"Error: Nie znaleziono żadnych etykiet!"
+                f"Ścieżka: {self.labels_path}"
+            )
 
-        return labels
+        return labels_container
 
 
-    def _get_label(self, index: int) -> Label:
-        label = self.labels[index]
+    def get_label(self, index: int) -> Label:
+        label = self.labels_container[index]
 
         return Label(
             reference_image_name=label['reference_image_name'],

@@ -2,6 +2,7 @@ from abc import abstractmethod, ABC
 from pathlib import Path
 from typing import Any, Generic, TypeVar
 
+import pandas as pd
 import torch
 from PIL import Image
 from torch.utils.data import Dataset as TorchDataset
@@ -15,18 +16,20 @@ from src.utils.paths import PROJECT_ROOT
 
 LabelsContainerType = TypeVar('LabelsContainerType')
 
-
 class BaseDataset(ABC, TorchDataset, Generic[LabelsContainerType]):
     def __init__(self, config):
         self._config = config
 
         self._labels_path = PROJECT_ROOT / config['dataset']['labels_path']
 
-        self._reference_images_path = Path(config['dataset']['reference_images_path'])
-        self._distorted_images_path = Path(config['dataset']['distorted_images_path'])
+        self._reference_images_path = Path(config['dataset']['images']['reference']['path'])
+        self._distorted_images_path = Path(config['dataset']['images']['distorted']['path'])
 
-        self._reference_images_map = FileMap(files_directory_path=self.reference_images_path)
-        self._distorted_images_map = FileMap(files_directory_path=self.distorted_images_path)
+        self._reference_image_map = FileMap(files_directory_path=self.reference_images_path)
+        self._distorted_image_map = FileMap(files_directory_path=self.distorted_images_path)
+
+        self._reference_image_count = config['dataset']['images']['reference']['count']
+        self._distorted_image_count = config['dataset']['images']['distorted']['count']
 
         self._target_image_size = (
             config['model']['input']['image_size']['width'],
@@ -41,7 +44,7 @@ class BaseDataset(ABC, TorchDataset, Generic[LabelsContainerType]):
 
 
     def __getitem__(self, index):
-        label = self._get_label(index)
+        label = self.get_label(index)
 
         reference_image_name = label['reference_image_name']
         distorted_image_name = label['distorted_image_name']
@@ -73,12 +76,12 @@ class BaseDataset(ABC, TorchDataset, Generic[LabelsContainerType]):
 
 
     def __len__(self):
-        return len(self.labels)
+        return len(self.labels_container)
 
 
     @property
     @abstractmethod
-    def labels(self) -> LabelsContainerType: ...
+    def labels_container(self) -> LabelsContainerType: ...
 
     @property
     def labels_path(self) -> Path:
@@ -98,11 +101,19 @@ class BaseDataset(ABC, TorchDataset, Generic[LabelsContainerType]):
 
     @property
     def reference_images_map(self) -> FileMap:
-        return self._reference_images_map
+        return self._reference_image_map
 
     @property
     def distorted_images_map(self) -> FileMap:
-        return self._distorted_images_map
+        return self._distorted_image_map
+
+    @property
+    def reference_images_count(self) -> int:
+        return self._reference_image_count
+
+    @property
+    def distorted_images_count(self) -> int:
+        return self._distorted_image_count
 
     @property
     def target_image_size(self) -> tuple[int, int]:
@@ -121,10 +132,21 @@ class BaseDataset(ABC, TorchDataset, Generic[LabelsContainerType]):
     def _unify_quality_score(self, value: float) -> UnifiedQualityScore: ...
 
     @abstractmethod
-    def _extract_reference_image_name(self, distorted_image_name: str) -> str: ...
+    def get_reference_image_name(self, distorted_image_name: str) -> str: ...
 
     @abstractmethod
-    def _build_labels(self) -> LabelsContainerType: ...
+    def get_reference_image_names_per_distorted_image(self) -> list[str]: ...
 
     @abstractmethod
-    def _get_label(self, index: int) -> Label: ...
+    def _build_labels_container(self) -> LabelsContainerType: ...
+
+    @abstractmethod
+    def get_label(self, index: int) -> Label: ...
+
+    def get_all_labels(self) -> list[Label]:
+        labels: list[Label] = []
+
+        for distorted_index in range(len(self)):  # zamiast self.distorted_images_count
+            labels.append(self.get_label(index=distorted_index))
+
+        return labels

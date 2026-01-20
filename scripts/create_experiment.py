@@ -5,10 +5,12 @@ from typing import Any
 
 import yaml
 
+from src.datasets.base_dataset import BaseDataset
 from src.utils.configs import check_config_consistency, load_config
 from src.utils.data_types import Config
+from src.utils.datasets import build_dataset
 from src.utils.paths import CONFIGS_PATH, EXPERIMENTS_PATH
-from src.utils.dataset_splits import generate_and_save_dataset_split
+from src.utils.dataset_splits import generate_dataset_split
 
 
 def clear_screen():
@@ -69,8 +71,7 @@ def create_experiment(
         raise FileNotFoundError('Error: Nie przekazano pliku konfiguracyjnego YAML ani pliku checkpointu z innego eksperymentu\n'
                                 'albo przekazany plik nie istnieje!')
 
-    if (config_path is not None and
-        checkpoint_path is not None):
+    if config_path is not None and checkpoint_path is not None:
         raise ValueError('Error: Przekazano jednocześnie plik konfiguracyjny YAML oraz plik checkpointu!\n'
                          'Można jednocześnie przekazać tylko jeden z argumentów!')
 
@@ -79,8 +80,9 @@ def create_experiment(
     if config_path is None or not config_path.exists():
         config_path = checkpoint_path.parent.parent / 'config.yaml'
 
-    with open(config_path, 'r') as config_file:
-        config: Config = yaml.safe_load(config_file)
+    config = load_config(config_path=config_path, check_consistency=True)
+
+    dataset: BaseDataset = build_dataset(config=config)
 
     dataset_name = config['dataset']['name']
 
@@ -112,11 +114,13 @@ def create_experiment(
         shutil.copy2(config_path, (experiment_path / 'config.yaml'))
 
         if checkpoint_path is None:
-            generate_and_save_dataset_split(
-                dataset_length=config['dataset']['length'],
-                train_split=config['training']['split']['train_split'],
-                output_directory=(experiment_path / 'splits/'),
-                random_seed=config['training']['split']['random_seed']
+            generate_dataset_split(
+                dataset=dataset,
+                train_split=config['training']['splits']['train'],
+                validation_split=config['training']['splits']['validation'],
+                test_split=config['training']['splits']['test'],
+                random_seed=config['training']['splits']['random_seed'],
+                output_directory=(experiment_path / 'splits/')
             )
         else:
             shutil.copytree(

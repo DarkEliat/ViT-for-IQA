@@ -6,7 +6,7 @@ from src.utils.paths import (EXPERIMENTS_KADID10K_PATH,
 
 
 def main() -> None:
-    trainer = Trainer(experiment_path=(EXPERIMENTS_KADID10K_PATH / 'test'))
+    trainer = Trainer(experiment_path=(EXPERIMENTS_LIVE_PATH / 'test'))
     trainer.train()
 
 

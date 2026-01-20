@@ -48,12 +48,25 @@ def _get_section(config: Config, section_key: str) -> dict[str, Any]:
 
 
 def _require_keys(section_name: str, section: dict[str, Any], required_keys: set[str]) -> None:
+    if not isinstance(section, dict):
+        raise TypeError(f"Sekcja `{section_name}` powinna być słownikiem (dict)!")
+
     missing_keys = required_keys - section.keys()
     if missing_keys:
         raise ValueError(
             f"Error: Sekcja `{section_name}` jest niekompletna!\n"
             f"Brakuje: {sorted(missing_keys)}"
         )
+
+
+def _check_app_section(app: dict[str, Any]) -> None:
+    _require_keys(
+        section_name='app',
+        section=app,
+        required_keys={
+            'version'
+        }
+    )
 
 
 def _check_dataset_section(dataset: dict[str, Any]) -> None:
@@ -63,54 +76,112 @@ def _check_dataset_section(dataset: dict[str, Any]) -> None:
         required_keys={
             'representative_name',
             'name',
-            'length',
             'original_image_size',
-            'reference_images_path',
-            'distorted_images_path',
+            'images',
             'quality_label',
             'labels_path',
-    })
+        }
+    )
+
 
     # --------------- representative_name ---------------
     if not isinstance(dataset['representative_name'], str) or dataset['representative_name'].strip() == '':
         raise ValueError('Error: `dataset.representative_name` musi być niepustym stringiem!')
 
+
     # --------------- name ---------------
     if not isinstance(dataset['name'], str) or dataset['name'].strip() == '':
         raise ValueError('Error: `dataset.name` musi być niepustym stringiem!')
 
-    # --------------- length ---------------
-    if not isinstance(dataset['length'], int) or dataset['length'] <= 0:
-        raise ValueError('Error: `dataset.length` musi być dodatnią liczbą całkowitą!')
 
     # --------------- original_image_size ---------------
     original_image_size = dataset['original_image_size']
-    if not isinstance(original_image_size, dict):
-        raise TypeError('Error: `dataset.original_image_size` musi być słownikiem (dict)!')
+    _require_keys(
+        section_name='dataset.original_image_size',
+        section=original_image_size,
+        required_keys={
+            'width',
+            'height'
+        }
+    )
 
-    for dimension_name in ('width', 'height'):
-        if (
-            dimension_name not in original_image_size or
-            not isinstance(original_image_size[dimension_name], int) or
-            original_image_size[dimension_name] <= 0
-        ):
-            raise ValueError('Error: `dataset.original_image_size` musi zawierać dodatnie wartości `width` oraz `height`!')
 
-    # --------------- reference_images_path ---------------
-    reference_images_path = PROJECT_ROOT / dataset['reference_images_path']
+    # --------------- original_image_size.width ---------------
+    width = original_image_size['width']
+    if not isinstance(width, int) or width <= 0:
+        raise ValueError('Error: `dataset.original_image_size.width` musi być dodatnią liczbą całkowitą!')
+
+
+    # --------------- original_image_size.height ---------------
+    height = original_image_size['height']
+    if not isinstance(height, int) or height <= 0:
+        raise ValueError('Error: `dataset.original_image_size.height` musi być dodatnią liczbą całkowitą!')
+
+
+    # --------------- images ---------------
+    images = dataset['images']
+    _require_keys(
+        section_name='dataset.images',
+        section=images,
+        required_keys={
+            'reference',
+            'distorted'
+        }
+    )
+
+
+    # --------------- images.reference ---------------
+    reference = images['reference']
+    _require_keys(
+        section_name='dataset.images.reference',
+        section=reference,
+        required_keys={
+            'path',
+            'count'
+        }
+    )
+
+
+    # --------------- images.reference.path ---------------
+    reference_images_path = PROJECT_ROOT / reference['path']
     if not reference_images_path.exists() or not reference_images_path.is_dir():
         raise FileNotFoundError(
-            f"Error: `dataset.reference_images_path` nie istnieje lub nie jest katalogiem!\n"
+            f"Error: `dataset.images.reference.path` nie istnieje lub nie jest katalogiem!\n"
             f"Ścieżka: {reference_images_path}"
         )
 
-    # --------------- distorted_images_path ---------------
-    distorted_images_path = PROJECT_ROOT / dataset['distorted_images_path']
+
+    # --------------- images.reference.count ---------------
+    reference_images_count = reference['count']
+    if reference_images_count < 1:
+        raise FileNotFoundError('Error: `dataset.images.reference.count` musi być dodatnią liczbą całkowitą!')
+
+
+    # --------------- images.distorted ---------------
+    distorted = images['distorted']
+    _require_keys(
+        section_name='dataset.images.distorted',
+        section=distorted,
+        required_keys={
+            'path',
+            'count'
+        }
+    )
+
+    # --------------- images.distorted.path ---------------
+    distorted_images_path = PROJECT_ROOT / distorted['path']
     if not distorted_images_path.exists() or not distorted_images_path.is_dir():
         raise FileNotFoundError(
-            f"Error: `dataset.distorted_images_path` nie istnieje lub nie jest katalogiem!\n"
+            f"Error: `dataset.images.distorted.path` nie istnieje lub nie jest katalogiem!\n"
             f"Ścieżka: {distorted_images_path}"
         )
+
+
+    # --------------- images.distorted.count ---------------
+    distorted_images_count = distorted['count']
+    if distorted_images_count < 1:
+        raise FileNotFoundError('Error: `dataset.images.distorted.count` musi być dodatnią liczbą całkowitą!')
+
 
     # --------------- quality_label ---------------
     quality_label = dataset['quality_label']
@@ -127,14 +198,20 @@ def _check_dataset_section(dataset: dict[str, Any]) -> None:
         }
     )
 
+
+    # --------------- quality_label.type ---------------
     if quality_label['type'] not in ('mos', 'dmos'):
         raise ValueError('Error: `dataset.quality_label.type` musi mieć wartość `mos` albo `dmos`!')
 
+
+    # --------------- quality_label.min ---------------
+    # --------------- quality_label.max ---------------
     if not isinstance(quality_label['min'], (int, float)) or not isinstance(quality_label['max'], (int, float)):
         raise TypeError('Error: `dataset.quality_label.min` oraz `dataset.quality_label.max` muszą być liczbami!')
 
     if quality_label['min'] >= quality_label['max']:
         raise ValueError('Error: `dataset.quality_label` ma niepoprawny zakres (`min` >= `max`)!')
+
 
     # --------------- labels_path ---------------
     labels_path = PROJECT_ROOT / dataset['labels_path']
@@ -157,15 +234,14 @@ def _check_model_section(model: dict[str, Any]) -> None:
         }
     )
 
+
     # --------------- name ---------------
     if not isinstance(model['name'], str) or not model['name']:
         raise ValueError('Error: `model.name` musi być niepustym stringiem!')
 
+
     # --------------- input ---------------
     model_input = model['input']
-    if not isinstance(model_input, dict):
-        raise TypeError('Error: `model.input` musi być słownikiem (dict)!')
-
     _require_keys(
         section_name='model.input',
         section=model_input,
@@ -176,24 +252,22 @@ def _check_model_section(model: dict[str, Any]) -> None:
             'are_images_square',
             'image_size',
             'keep_original_aspect_ratio',
-        },
+        }
     )
 
+
+    # --------------- input.type ---------------
     if model_input['type'] != 'images':
         raise ValueError('Error: Aktualnie obsługiwany jest wyłącznie `model.input.type` == `images`!')
 
+
+    # --------------- input.num_of_images ---------------
     if model_input['num_of_images'] != 2:
         raise ValueError('Error: FR-IQA wymaga dokładnie 2 obrazy (referencyjny + zniekształcony)!')
 
-    for bool_key in ('have_same_image_size', 'are_images_square', 'keep_original_aspect_ratio'):
-        if not isinstance(model_input[bool_key], bool):
-            raise TypeError(f"Error: `model.input.{bool_key}` musi być typu bool!")
 
+    # --------------- input.image_size ---------------
     image_size = model_input['image_size']
-
-    if not isinstance(image_size, dict):
-        raise TypeError('Error: `model.input.image_size` musi być słownikiem (dict)!')
-
     _require_keys(
         section_name='model.input.image_size',
         section=image_size,
@@ -203,18 +277,34 @@ def _check_model_section(model: dict[str, Any]) -> None:
         }
     )
 
-    for dimension_name in ('width', 'height'):
-        if not isinstance(image_size[dimension_name], int) or image_size[dimension_name] <= 0:
-            raise ValueError('Error: `model.input.image_size.width/height` muszą być dodatnimi liczbami całkowitymi!')
+    # --------------- input.image_size.width ---------------
+    width = image_size['width']
+    if not isinstance(width, int) or width <= 0:
+        raise ValueError('Error: `model.input.image_size.width` musi być dodatnią liczbą całkowitą!')
+
+    # --------------- input.image_size.height ---------------
+    height = image_size['height']
+    if not isinstance(height, int) or height <= 0:
+        raise ValueError('Error: `model.input.image_size.height` musi być dodatnią liczbą całkowitą!')
+
+
+    # --------------- input.have_same_image_size ---------------
+    # --------------- input.are_images_square ---------------
+    # --------------- input.keep_original_aspect_ratio ---------------
+    for bool_key in ('have_same_image_size', 'are_images_square', 'keep_original_aspect_ratio'):
+        if not isinstance(model_input[bool_key], bool):
+            raise TypeError(f"Error: `model.input.{bool_key}` musi być typu bool!")
 
     if model_input['are_images_square'] and image_size['width'] != image_size['height']:
         raise ValueError('Error: `model.input.are_images_square == True`, ale `image_size.width` != `image_size.height`!')
+
 
     # --------------- embedding_dimension ---------------
     embedding_dimension = model['embedding_dimension']
 
     if not isinstance(embedding_dimension, int) or embedding_dimension <= 0 or embedding_dimension % 2 != 0:
         raise ValueError('Error: `model.embedding_dimension` musi być dodatnią parzystą liczbą całkowitą!')
+
 
     # --------------- output ---------------
     output_config = model['output']
@@ -231,9 +321,14 @@ def _check_model_section(model: dict[str, Any]) -> None:
         }
     )
 
+
+    # --------------- output.min ---------------
+    # --------------- output.max ---------------
     if output_config['min'] != 0 or output_config['max'] != 1:
         raise ValueError('Error: Zakres `model.output` musi wynosić dokładnie [0, 1]!')
 
+
+    # --------------- output.type ---------------
     if output_config['type'] not in ('normalized_mos', 'inverted_normalized_dmos'):
         raise ValueError('Error: `model.output.type` musi mieć wartość `normalized_mos` albo `inverted_normalized_dmos`!')
 
@@ -244,7 +339,7 @@ def _check_training_section(training: dict[str, Any]) -> None:
         section=training,
         required_keys={
             'quality_label',
-            'split',
+            'splits',
             'batch_size',
             'num_of_epochs',
             'early_stopping',
@@ -253,6 +348,7 @@ def _check_training_section(training: dict[str, Any]) -> None:
             'num_of_workers',
         },
     )
+
 
     # --------------- quality_label ---------------
     quality_label = training['quality_label']
@@ -269,37 +365,58 @@ def _check_training_section(training: dict[str, Any]) -> None:
         }
     )
 
-    # --------------- split ---------------
-    split = training['split']
-    if not isinstance(quality_label, dict):
-        raise TypeError('Error: `training.split` musi być słownikiem (dict)!')
 
+    # --------------- splits ---------------
+    splits = training['splits']
     _require_keys(
-        section_name='training.quality_label',
-        section=split,
+        section_name='training.splits',
+        section=splits,
         required_keys={
-            'train_split',
+            'train',
+            'validation',
+            'test',
             'random_seed',
         }
     )
 
-    if not isinstance(training['split']['train_split'], (int, float)) or not 0 < training['split']['train_split'] < 1:
-        raise ValueError('Error: `training.split.train_split` musi być z zakresu (0, 1)!')
 
-    if not isinstance(training['split']['random_seed'], int) or not 0 < training['split']['random_seed'] >= 0:
+    # --------------- splits.train ---------------
+    # --------------- splits.validation ---------------
+    # --------------- splits.test ---------------
+    if not isinstance(training['splits']['train'], (int, float)) or not 0 < training['splits']['train'] < 1:
+        raise ValueError('Error: `training.splits.train` musi być z zakresu (0, 1)!')
+
+    if not isinstance(training['splits']['validation'], (int, float)) or not 0 < training['splits']['validation'] < 1:
+        raise ValueError('Error: `training.splits.validation` musi być z zakresu (0, 1)!')
+
+    if not isinstance(training['splits']['test'], (int, float)) or not 0 < training['splits']['test'] < 1:
+        raise ValueError('Error: `training.splits.test` musi być z zakresu (0, 1)!')
+
+    split_sum = training['splits']['train'] + training['splits']['validation'] + training['splits']['test']
+    if abs(split_sum - 1.0) > 1e-9:
+        raise ValueError(
+            f"Error: Parametry `training.splits.train`, `training.splits.validation` oraz `training.splits.test` muszą sumować się do 1.0 (100%) !\n"
+            f"Aktualna suma: {split_sum}"
+        )
+
+
+    # --------------- splits.random_seed ---------------
+    if not isinstance(training['splits']['random_seed'], int) or not 0 < training['splits']['random_seed'] >= 0:
         raise ValueError('Error: `training.split.train_split` musi być liczbą całkowitą większą lub równą 0!')
+
 
     # --------------- batch_size ---------------
     if not isinstance(training['batch_size'], int) or training['batch_size'] <= 0:
         raise ValueError('Error: `training.batch_size` musi być dodatnią liczbą całkowitą!')
 
+
     # --------------- num_of_epochs ---------------
     if not isinstance(training['num_of_epochs'], int) or training['num_of_epochs'] <= 0:
         raise ValueError('Error: `training.num_of_epochs` musi być dodatnią liczbą całkowitą!')
 
+
     # --------------- early_stopping ---------------
     early_stopping = training['early_stopping']
-
     _require_keys(
         section_name='training.early_stopping',
         section=early_stopping,
@@ -326,9 +443,11 @@ def _check_training_section(training: dict[str, Any]) -> None:
     ):
         raise ValueError('Error: `training.early_stopping.min_improvement_delta` musi być >= 0!')
 
+
     # --------------- learning_rate ---------------
     if not isinstance(training['learning_rate'], (int, float)) or training['learning_rate'] <= 0:
         raise ValueError('Error: `training.learning_rate` musi być > 0!')
+
 
     # --------------- device ---------------
     device = training['device']
@@ -337,6 +456,7 @@ def _check_training_section(training: dict[str, Any]) -> None:
 
     if device not in ('cpu', 'cuda', 'cuda:0'):
         raise ValueError('Error: `training.device` musi mieć wartość: `cpu`, `cuda` lub `cuda:0`!')
+
 
     # --------------- num_of_workers ---------------
     if not isinstance(training['num_of_workers'], int) or training['num_of_workers'] < 0:
@@ -355,9 +475,11 @@ def _check_checkpointing_section(checkpointing: dict[str, Any]) -> None:
         }
     )
 
+
     # --------------- enabled ---------------
     if not isinstance(checkpointing['enabled'], bool):
         raise TypeError('Error: `checkpointing.enabled` musi być typu bool!')
+
 
     # --------------- save_every_n_epochs ---------------
     save_every_n_epochs = checkpointing['save_every_n_epochs']
@@ -367,6 +489,7 @@ def _check_checkpointing_section(checkpointing: dict[str, Any]) -> None:
 
     if save_every_n_epochs <= 0:
         raise ValueError('Error: `checkpointing.save_every_n_epochs` musi być większe od 0!')
+
 
     # --------------- save_last_epoch ---------------
     # --------------- save_best_epoch ---------------
@@ -383,6 +506,7 @@ def _check_logging_section(logging: dict[str, Any]) -> None:
             'tensorboard'
         }
     )
+
 
     # --------------- tensorboard ---------------
     if not isinstance(logging['tensorboard'], bool):
@@ -420,12 +544,14 @@ def _check_cross_section_consistency(config: dict[str, Any]) -> None:
 
 def check_config_consistency(config: Config, path: Path | None = None) -> None:
     try:
+        app_config = _get_section(config, section_key='app')
         dataset_config = _get_section(config, section_key='dataset')
         model_config = _get_section(config, section_key='model')
         training_config = _get_section(config, section_key='training')
         checkpointing_config = _get_section(config, section_key='checkpointing')
         logging_config = _get_section(config, section_key='logging')
 
+        _check_app_section(app_config)
         _check_dataset_section(dataset_config)
         _check_model_section(model_config)
         _check_training_section(training_config)
