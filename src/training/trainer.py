@@ -7,14 +7,11 @@ from torch.utils.data import DataLoader, Dataset, Subset
 from torch.optim import Adam, Optimizer
 from torch.utils.tensorboard import SummaryWriter
 
-from src.datasets.kadid_dataset import Kadid10kDataset
-from src.datasets.tid_dataset import Tid2008Dataset, Tid2013Dataset
-from src.datasets.live_dataset import LiveDataset
 from src.models.vit_regressor import VitRegressor
 from src.utils.checkpoints import load_checkpoint_pickle
-from src.utils.configs import load_config, check_config_consistency
-from src.utils.dataset_splits import load_split_indices
-from src.utils.datasets import build_dataset
+from src.utils.configs import load_config
+from src.datasets.factory import build_dataset
+from src.datasets.splits import load_split_indices
 
 
 class Trainer:
@@ -68,13 +65,13 @@ class Trainer:
             f"    Nazwa configu: `{self.config['config_name']}`"
         )
 
-        # Dataloadery
-        self.train_loader, self.validation_loader = self._build_dataloaders()
+        # Data Loadery
+        self.train_loader, self.validation_loader = self._build_data_loaders()
 
 
-    def _build_dataloaders(self) -> tuple[DataLoader, DataLoader]:
+    def _build_data_loaders(self) -> tuple[DataLoader, DataLoader]:
         """
-        Tworzy dataloadery do treningu i walidacji dla wybranej bazy danych.
+        Tworzy data loadery do treningu i walidacji dla wybranej bazy danych.
         """
 
         train_indices_path = self.splits_path / 'train_indices.csv'
@@ -120,7 +117,7 @@ class Trainer:
         return train_loader, validation_loader
 
 
-    def _train_one_epoch(self) -> float:
+    def train_one_epoch(self) -> float:
         """
         Wykonuje jedną epokę szkolenia.
         """
@@ -149,7 +146,7 @@ class Trainer:
         return running_loss / max(batch_count, 1)
 
 
-    def _validate_one_epoch(self) -> float:
+    def validate_last_epoch(self) -> float:
         """
         Wykonuje jedną epokę walidacji.
         """
@@ -195,7 +192,7 @@ class Trainer:
         return save_checkpoint_triggers
 
 
-    def _save_checkpoint(
+    def save_checkpoint(
             self,
             epoch: int,
             train_loss: float,
@@ -242,7 +239,7 @@ class Trainer:
             print(f"    {best_checkpoint_path}")
 
 
-    def _load_checkpoint(self, checkpoint_path: Path) -> int:
+    def load_checkpoint(self, checkpoint_path: Path) -> int:
         checkpoint = load_checkpoint_pickle(
             checkpoint_path=checkpoint_path,
             device=self.device,
@@ -269,7 +266,7 @@ class Trainer:
         return any(self.checkpoints_path.glob('*.pth'))
 
 
-    def _try_resume(self) -> int:
+    def try_resume(self) -> int:
         if not self.any_checkpoint_exists():
             return 0
 
@@ -331,7 +328,7 @@ class Trainer:
                 choice = choice.lower()
 
                 if choice in ('y', 't'):
-                    return self._load_checkpoint(checkpoint_path=checkpoint_to_load)
+                    return self.load_checkpoint(checkpoint_path=checkpoint_to_load)
                 elif choice == 'n':
                     input('PRZERYWAM DZIAŁANIE PROGRAMU! Naciśnij Enter...')
                     exit(1)
@@ -347,7 +344,7 @@ class Trainer:
         num_of_epochs = self.config['training']['num_of_epochs']
         start_epoch = 1
 
-        epoch_from_checkpoint = self._try_resume()
+        epoch_from_checkpoint = self.try_resume()
 
         if epoch_from_checkpoint > 1:
             start_epoch = epoch_from_checkpoint
@@ -357,8 +354,8 @@ class Trainer:
         for epoch in range(start_epoch, num_of_epochs+1):
             print(f"\n[Trainer] Rozpoczęto trening {epoch}. epoki.")
 
-            train_loss = self._train_one_epoch()
-            validation_loss = self._validate_one_epoch()
+            train_loss = self.train_one_epoch()
+            validation_loss = self.validate_last_epoch()
 
             if self.log_writer:
                 self.log_writer.add_scalar('loss/train', train_loss, epoch)
@@ -372,10 +369,10 @@ class Trainer:
 
             save_checkpoint_triggers = self.check_checkpoint_save_due(epoch=epoch)
             if any(save_checkpoint_triggers.values()):
-                self._save_checkpoint(epoch=epoch,
-                                      train_loss=train_loss,
-                                      validation_loss=validation_loss,
-                                      save_triggers=save_checkpoint_triggers)
+                self.save_checkpoint(epoch=epoch,
+                                     train_loss=train_loss,
+                                     validation_loss=validation_loss,
+                                     save_triggers=save_checkpoint_triggers)
 
         if start_epoch <= num_of_epochs:
             print(f"\n[Trainer] Cały trening zakończony!\n"

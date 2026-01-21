@@ -1,13 +1,13 @@
 import random
-from pathlib import Path
 from collections import defaultdict
+from pathlib import Path
 
 import pandas as pd
 
 from src.datasets.base_dataset import BaseDataset
 
 
-def generate_dataset_split(
+def generate_split(
         dataset: BaseDataset,
         train_split: float,
         validation_split: float,

@@ -1,4 +1,4 @@
-from typing import TypedDict, Any
+from typing import TypedDict, Any, Literal
 from dataclasses import dataclass
 
 
@@ -46,3 +46,21 @@ class Checkpoint(TypedDict):
     optimizer_state_dict: StateDict
     train_loss: float
     validation_loss: float
+
+
+SplitName = Literal['train', 'validation', 'test']
+
+@dataclass(frozen=True)
+class EvaluationResults:
+    plcc: float
+    srcc: float
+    krcc: float
+    mse: float
+    rmse: float
+    mae: float
+    num_of_samples: int
+    split_name: SplitName
+    checkpoint_name: str
+    config_name: str
+    dataset_name: str
+    device: str

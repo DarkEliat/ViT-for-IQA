@@ -1,16 +1,12 @@
 import os
 from pathlib import Path
 import shutil
-from typing import Any
-
-import yaml
 
 from src.datasets.base_dataset import BaseDataset
-from src.utils.configs import check_config_consistency, load_config
-from src.utils.data_types import Config
-from src.utils.datasets import build_dataset
+from src.utils.configs import load_config
+from src.datasets.factory import build_dataset
+from src.datasets.splits import generate_split
 from src.utils.paths import CONFIGS_PATH, EXPERIMENTS_PATH
-from src.utils.dataset_splits import generate_dataset_split
 
 
 def clear_screen():
@@ -114,7 +110,7 @@ def create_experiment(
         shutil.copy2(config_path, (experiment_path / 'config.yaml'))
 
         if checkpoint_path is None:
-            generate_dataset_split(
+            generate_split(
                 dataset=dataset,
                 train_split=config['training']['splits']['train'],
                 validation_split=config['training']['splits']['validation'],

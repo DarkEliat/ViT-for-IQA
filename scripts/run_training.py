@@ -1,12 +1,14 @@
 from src.training.trainer import Trainer
-from src.utils.paths import (EXPERIMENTS_KADID10K_PATH,
-                             EXPERIMENTS_TID2008_PATH,
-                             EXPERIMENTS_TID2013_PATH,
-                             EXPERIMENTS_LIVE_PATH)
+from src.utils.paths import (
+    EXPERIMENTS_KADID10K_PATH,
+    EXPERIMENTS_TID2008_PATH,
+    EXPERIMENTS_TID2013_PATH,
+    EXPERIMENTS_LIVE_PATH
+)
 
 
 def main() -> None:
-    trainer = Trainer(experiment_path=(EXPERIMENTS_LIVE_PATH / 'test'))
+    trainer = Trainer(experiment_path=(EXPERIMENTS_TID2008_PATH / 'test'))
     trainer.train()
 
 

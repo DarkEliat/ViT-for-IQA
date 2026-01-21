@@ -1,7 +1,4 @@
-from pathlib import Path
-from pprint import pprint
-
-from src.inference.predictor import Predictor
+from src.evaluation.evaluator import Evaluator
 from src.utils.paths import (
     EXPERIMENTS_KADID10K_PATH,
     EXPERIMENTS_TID2008_PATH,
@@ -9,17 +6,17 @@ from src.utils.paths import (
     EXPERIMENTS_LIVE_PATH
 )
 
-
 def main() -> None:
-    predictor = Predictor(
+    evaluator = Evaluator(
         experiment_path=(EXPERIMENTS_LIVE_PATH / 'test/'),
+        split_name='test',
         checkpoint_name='last.pth'
     )
 
-    predicted_quality_scores = predictor.predict_on_training_dataset()
-
-    print()
-    pprint(predicted_quality_scores)
+    evaluator.evaluate(
+        apply_nonlinear_regression_for_plcc=True,
+        save_outputs=True
+    )
 
 
 if __name__ == '__main__':

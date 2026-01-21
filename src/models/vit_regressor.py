@@ -16,9 +16,11 @@ class VitRegressor(nn.Module):
         - przewidywany DMOS: tensor [batch_size]
     """
 
-    def __init__(self,
-                 model_name: str,
-                 embedding_dimension: int) -> None:
+    def __init__(
+            self,
+            model_name: str,
+            embedding_dimension: int
+    ) -> None:
         super().__init__()
 
         # Tworzenie modelu ViT z bibliotekami timm.
