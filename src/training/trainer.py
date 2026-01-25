@@ -127,14 +127,14 @@ class Trainer:
         running_loss = 0.0
         batch_count = 0
 
-        for distorted_image_tensor, distorted_image_tensor, dmos_value_tensor in self.train_loader:
-            distorted_image_tensor = distorted_image_tensor.to(self.device)
+        for reference_image_tensor, distorted_image_tensor, dmos_value_tensor in self.train_loader:
+            reference_image_tensor = reference_image_tensor.to(self.device)
             distorted_image_tensor = distorted_image_tensor.to(self.device)
             dmos_value_tensor = dmos_value_tensor.to(self.device)
 
             self.optimizer.zero_grad()
 
-            prediction: Tensor = self.model(distorted_image_tensor, distorted_image_tensor)
+            prediction: Tensor = self.model(reference_image_tensor, distorted_image_tensor)
             loss: Tensor =  self.loss_function(prediction, dmos_value_tensor)
 
             loss.backward()
