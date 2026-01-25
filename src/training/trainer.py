@@ -10,7 +10,7 @@ from torch.utils.tensorboard import SummaryWriter
 from src.models.vit_regressor import VitRegressor
 from src.utils.checkpoints import load_checkpoint_pickle
 from src.utils.configs import load_config
-from src.datasets.factory import build_dataset
+from src.datasets.factory import build_dataset, build_split_data_loader
 from src.datasets.splits import load_split_indices
 
 
@@ -66,55 +66,16 @@ class Trainer:
         )
 
         # Data Loadery
-        self.train_loader, self.validation_loader = self._build_data_loaders()
-
-
-    def _build_data_loaders(self) -> tuple[DataLoader, DataLoader]:
-        """
-        Tworzy data loadery do treningu i walidacji dla wybranej bazy danych.
-        """
-
-        train_indices_path = self.splits_path / 'train_indices.csv'
-        validation_indices_path = self.splits_path / 'validation_indices.csv'
-
-        if not train_indices_path.exists() or not validation_indices_path.exists():
-            raise FileNotFoundError(
-                f"Error: Brak co najmniej jednego pliku .csv splitu datasetu!\n"
-                f"Wymagane pliki to:\n"
-                f"{train_indices_path}\n"
-                f"{validation_indices_path}\n"
-                f"Upewnij się, że eksperyment został poprawnie utworzony."
-            )
-
-        print(
-            f"\n[Trainer] Ładowanie datasetu `{self.dataset_name}` w celu szkolenia modelu ViT...\n"
-            f"    To może potrwać nawet do kilku minut..."
+        self.train_loader = build_split_data_loader(
+            config=config,
+            split_name='train',
+            experiment_path=experiment_path
         )
-
-        config = self.config
-
-        train_indices = load_split_indices(file_path=train_indices_path)
-        validation_indices = load_split_indices(file_path=validation_indices_path)
-
-        dataset: Dataset = build_dataset(config=config)
-        train_dataset = Subset(dataset, train_indices)
-        validation_dataset = Subset(dataset, validation_indices)
-
-        train_loader = DataLoader(
-            train_dataset,
-            batch_size=config['training']['batch_size'],
-            shuffle=True,
-            num_workers=config['training']['num_of_workers']
+        self.validation_loader = build_split_data_loader(
+            config=config,
+            split_name='validation',
+            experiment_path=experiment_path
         )
-
-        validation_loader = DataLoader(
-            validation_dataset,
-            batch_size=config['training']['batch_size'],
-            shuffle=True,
-            num_workers=config['training']['num_of_workers']
-        )
-
-        return train_loader, validation_loader
 
 
     def train_one_epoch(self) -> float:

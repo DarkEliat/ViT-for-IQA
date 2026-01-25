@@ -81,7 +81,7 @@ def build_split_data_loader(
 
     print(
         f"Ładowanie splitu `{split_name}`...\n"
-        f"    Ścieżka eksperymentu: {experiment_path}\n"
+        f"    Ścieżka: {split_indices_path}\n"
         f"    To może potrwać nawet do kilku minut..."
     )
 
