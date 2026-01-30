@@ -1,7 +1,7 @@
 config_name: "kadid10k_vit_base_patch16_224_baseline"
 
 app:
-  version: "0.1.0"
+  version: "0.1.1"
 
 dataset:
   representative_name: "KADID-10k"

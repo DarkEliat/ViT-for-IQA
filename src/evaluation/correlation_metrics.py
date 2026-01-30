@@ -5,12 +5,7 @@ import numpy as np
 from scipy.stats import pearsonr, spearmanr, kendalltau
 from scipy.optimize import curve_fit
 
-
-@dataclass(frozen=True)
-class CorrelationMetrics:
-    plcc: float
-    srcc: float
-    krcc: float
+from src.utils.data_types import CorrelationMetrics
 
 
 def _five_parameter_logistic_function(
@@ -136,8 +131,8 @@ def compute_correlations(
     # PLCC
     if apply_nonlinear_regression_for_plcc:
         predicted_array_for_plcc = _apply_nonlinear_regression(
-            predicted_array,
-            ground_truth_array
+            ground_truth_array,
+            predicted_array
         )
     else:
         predicted_array_for_plcc = predicted_array

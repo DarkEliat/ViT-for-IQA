@@ -38,29 +38,48 @@ class Label(TypedDict):
     quality_score: QualityScore
 
 
-StateDict = dict[str, Tensor]
+@dataclass(frozen=True)
+class CorrelationMetrics:
+    plcc: float = float('-inf')
+    srcc: float = float('-inf')
+    krcc: float = float('-inf')
 
-class Checkpoint(TypedDict):
-    epoch: int
-    model_state_dict: StateDict
-    optimizer_state_dict: StateDict
-    train_loss: float
-    validation_loss: float
+
+@dataclass(frozen=True)
+class LossMetrics:
+    mse: float = float('inf')
+    rmse: float = float('inf')
+    mae: float = float('inf')
 
 
 SplitName = Literal['train', 'validation', 'test']
 
 @dataclass(frozen=True)
 class EvaluationResults:
-    plcc: float
-    srcc: float
-    krcc: float
-    mse: float
-    rmse: float
-    mae: float
+    correlation: CorrelationMetrics
+    loss: LossMetrics
     num_of_samples: int
     split_name: SplitName
     checkpoint_name: str
     config_name: str
     dataset_name: str
     device: str
+
+
+@dataclass
+class CheckpointInfo:
+    epoch: int = 0
+    train_loss: LossMetrics = LossMetrics()
+    validation_loss: LossMetrics = LossMetrics()
+    validation_correlation: CorrelationMetrics = CorrelationMetrics()
+
+
+StateDict = dict[str, Tensor]
+
+@dataclass(frozen=True)
+class CheckpointPickle:
+    model_state_dict: StateDict
+    optimizer_state_dict: StateDict
+    last_epoch: CheckpointInfo
+    best_epoch: CheckpointInfo
+    config: Config

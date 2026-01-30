@@ -6,7 +6,7 @@ from torch.utils.data import DataLoader
 from src.models.vit_regressor import VitRegressor
 from src.utils.checkpoints import load_checkpoint_pickle
 from src.utils.configs import load_config
-from src.datasets.factory import build_data_loader
+from src.datasets.factory import build_all_data_loader
 
 
 class Predictor:
@@ -29,6 +29,12 @@ class Predictor:
         config = load_config(config_path=config_path, check_consistency=True)
         self.config = config
 
+        print(
+            f"\n[Predictor] Rozpoczęto ładowanie checkpointu:\n"
+            f"    Ścieżka checkpointu: {checkpoint_name}\n"
+            f"    Nazwa configu: `{self.config['config_name']}`"
+        )
+
         self.training_dataset_name = config['dataset']['name']
 
         self.device = config['training']['device']
@@ -48,13 +54,9 @@ class Predictor:
         self.model.to(self.device)
         self.model.eval()
 
-        print(
-            f"\n[Predictor] Załadowano checkpoint:\n"
-            f"    Ścieżka checkpointu: {checkpoint_name}\n"
-            f"    Nazwa configu: `{self.config['config_name']}`"
-        )
+        print('\n[Predictor] Załadowano checkpoint!')
 
-        self.training_data_loader = build_data_loader(config=self.config)
+        self.training_data_loader = build_all_data_loader(config=self.config)
 
     @torch.no_grad()
     def predict(self, data_loader: DataLoader) -> list[float]:

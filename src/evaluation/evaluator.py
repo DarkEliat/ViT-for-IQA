@@ -7,7 +7,7 @@ import torch
 
 from src.evaluation.correlation_metrics import CorrelationMetrics, compute_correlations
 from src.inference.predictor import Predictor
-from src.utils.data_types import SplitName, EvaluationResults
+from src.utils.data_types import SplitName, EvaluationResults, LossMetrics
 from src.datasets.factory import build_split_data_loader
 
 
@@ -55,14 +55,8 @@ class Evaluator:
             else self.config['training']['num_of_workers']
         )
 
-        self.data_loader = build_split_data_loader(
-            config=self.config,
-            split_name=split_name,
-            experiment_path=experiment_path
-        )
-
         print(
-            "\n[Evaluator] Załadowano eksperyment do ewaluacji:\n"
+            "\n[Evaluator] Rozpoczęto ładowanie eksperymentu:\n"
             f"    Ścieżka eksperymentu: {self.experiment_path}\n"
             f"    Nazwa checkpoint: `{self.checkpoint_name}`\n"
             f"    Nazwa datasetu: `{self.dataset_name}`\n"
@@ -72,6 +66,14 @@ class Evaluator:
             f"    Device: `{self.device}`\n"
             f"    Number of workers: {self.num_of_workers}\n"
         )
+
+        self.data_loader = build_split_data_loader(
+            config=self.config,
+            split_name=split_name,
+            experiment_path=experiment_path
+        )
+
+        print('\n[Evaluator] Załadowano eksperyment!')
 
 
     @torch.no_grad()
@@ -109,16 +111,16 @@ class Evaluator:
         errors_array = predicted_array - ground_truth_array
 
         mse_value = float(np.mean(np.square(errors_array)))
-        rmse_value = float(np.mean(np.sqrt(mse_value)))
+        rmse_value = float(np.sqrt(mse_value))
         mae_value = float(np.mean(np.abs(errors_array)))
 
         results = EvaluationResults(
-            plcc=correlation_metrics.plcc,
-            srcc=correlation_metrics.srcc,
-            krcc=correlation_metrics.krcc,
-            mse=mse_value,
-            rmse=rmse_value,
-            mae=mae_value,
+            correlation=correlation_metrics,
+            loss=LossMetrics(
+                mse=mse_value,
+                rmse=rmse_value,
+                mae=mae_value
+            ),
             num_of_samples=len(ground_truth_scores),
             split_name=self.split_name,
             checkpoint_name=self.checkpoint_name,
@@ -195,14 +197,14 @@ class Evaluator:
             f"- Number of samples: {results.num_of_samples}",
             "",
             "## Correlation metrics:",
-            f"- PLCC: `{results.plcc:.6f}`",
-            f"- SRCC: `{results.srcc:.6f}`",
-            f"- KRCC: `{results.krcc:.6f}`",
+            f"- PLCC: `{results.correlation.plcc:.6f}`",
+            f"- SRCC: `{results.correlation.srcc:.6f}`",
+            f"- KRCC: `{results.correlation.krcc:.6f}`",
             "",
             "## Error metrics:",
-            f"- MSE: {results.mse:.6f}",
-            f"- RMSE: {results.rmse:.6f}",
-            f"- MAE: {results.mae:.6f}",
+            f"- MSE: {results.loss.mse:.6f}",
+            f"- RMSE: {results.loss.rmse:.6f}",
+            f"- MAE: {results.loss.mae:.6f}",
             ""
         ]
 

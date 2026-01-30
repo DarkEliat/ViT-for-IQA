@@ -24,7 +24,7 @@ def build_dataset(config: Config) -> TorchDataset | BaseDataset:
             raise ValueError(f"Error: Niewspierany typ bazy danych: `{config['dataset']['name']}`!")
 
 
-def build_data_loader(config: Config) -> DataLoader:
+def build_all_data_loader(config: Config) -> DataLoader:
     if (
             not 'dataset' in config
             or
@@ -53,7 +53,8 @@ def build_data_loader(config: Config) -> DataLoader:
 def build_split_data_loader(
         config: Config,
         split_name: SplitName,
-        experiment_path: Path
+        experiment_path: Path,
+        shuffle: bool = False
 ) -> DataLoader:
     splits_path = experiment_path / 'splits/'
 
@@ -80,7 +81,7 @@ def build_split_data_loader(
         )
 
     print(
-        f"Ładowanie splitu `{split_name}`...\n"
+        f"\nŁadowanie splitu `{split_name}`...\n"
         f"    Ścieżka: {split_indices_path}\n"
         f"    To może potrwać nawet do kilku minut..."
     )

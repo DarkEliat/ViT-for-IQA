@@ -3,15 +3,15 @@ from pathlib import Path
 import torch
 import torch.nn as nn
 from torch import Tensor
-from torch.utils.data import DataLoader, Dataset, Subset
 from torch.optim import Adam, Optimizer
 from torch.utils.tensorboard import SummaryWriter
 
+from src.evaluation.correlation_metrics import CorrelationMetrics, compute_correlations
 from src.models.vit_regressor import VitRegressor
 from src.utils.checkpoints import load_checkpoint_pickle
 from src.utils.configs import load_config
-from src.datasets.factory import build_dataset, build_split_data_loader
-from src.datasets.splits import load_split_indices
+from src.datasets.factory import build_split_data_loader
+from src.utils.data_types import LossMetrics, CheckpointInfo, CheckpointPickle
 
 
 class Trainer:
@@ -21,6 +21,7 @@ class Trainer:
                 f"Error: Wskazany eksperyment nie istnieje!"
                 f"Ścieżka: {experiment_path}"
             )
+
 
         self.experiment_name = experiment_path.name
 
@@ -34,6 +35,13 @@ class Trainer:
         config = load_config(config_path=config_path, check_consistency=True)
         self.config = config
 
+        print(
+            f"\n[Trainer] Rozpoczęto ładowanie eksperymentu:\n"
+            f"    Nazwa eksperymentu: `{self.experiment_name}`\n"
+            f"    Ścieżka eksperymentu: {self.experiment_path}\n"
+            f"    Nazwa configu: `{self.config['config_name']}`"
+        )
+
         self.dataset_name = config['dataset']['name']
 
         self.device = config['training']['device']
@@ -44,8 +52,16 @@ class Trainer:
             embedding_dimension=config['model']['embedding_dimension']
         ).to(self.device)
 
-        # Definicja funkcji straty i optymalizatora
+        # Funkcja straty
         self.loss_function: nn.Module = nn.MSELoss()
+
+        # Metryki korelacji i dane epoki
+        self.last_epoch = CheckpointInfo()
+        self.best_epoch = CheckpointInfo()
+
+        self.best_min_delta: float = 1e-4
+
+        # Optymalizatora
         self.optimizer: Optimizer = Adam(
             params=self.model.parameters(),
             lr=config['training']['learning_rate']
@@ -58,12 +74,7 @@ class Trainer:
             else None
         )
 
-        print(
-            f"[Trainer] Załadowano eksperyment:\n"
-            f"    Nazwa eksperymentu: `{self.experiment_name}`\n"
-            f"    Ścieżka eksperymentu: {self.experiment_path}\n"
-            f"    Nazwa configu: `{self.config['config_name']}`"
-        )
+        print('\n[Trainer] Załadowano eksperyment!')
 
         # Data Loadery
         self.train_loader = build_split_data_loader(
@@ -88,15 +99,15 @@ class Trainer:
         running_loss = 0.0
         batch_count = 0
 
-        for reference_image_tensor, distorted_image_tensor, dmos_value_tensor in self.train_loader:
-            reference_image_tensor = reference_image_tensor.to(self.device)
-            distorted_image_tensor = distorted_image_tensor.to(self.device)
-            dmos_value_tensor = dmos_value_tensor.to(self.device)
+        for reference_image, distorted_image, ground_truth_score in self.train_loader:
+            reference_image = reference_image.to(self.device)
+            distorted_image = distorted_image.to(self.device)
+            ground_truth_score = ground_truth_score.to(self.device)
 
             self.optimizer.zero_grad()
 
-            prediction: Tensor = self.model(reference_image_tensor, distorted_image_tensor)
-            loss: Tensor =  self.loss_function(prediction, dmos_value_tensor)
+            prediction_score: Tensor = self.model(reference_image, distorted_image)
+            loss: Tensor =  self.loss_function(prediction_score, ground_truth_score)
 
             loss.backward()
             self.optimizer.step()
@@ -106,8 +117,8 @@ class Trainer:
 
         return running_loss / max(batch_count, 1)
 
-
-    def validate_last_epoch(self) -> float:
+    @torch.no_grad()
+    def validate_last_epoch(self) -> tuple[float, CorrelationMetrics]:
         """
         Wykonuje jedną epokę walidacji.
         """
@@ -117,48 +128,82 @@ class Trainer:
         running_loss = 0.0
         batch_count = 0
 
-        with torch.no_grad():
-            for reference_image, distorted_image, dmos_value in self.validation_loader:
-                reference_image = reference_image.to(self.device)
-                distorted_image = distorted_image.to(self.device)
-                dmos_value = dmos_value.to(self.device)
+        all_ground_truth_scores: list[float] = []
+        all_predicted_scores: list[float] = []
 
-                prediction: Tensor = self.model(reference_image, distorted_image)
-                loss: Tensor = self.loss_function(prediction, dmos_value)
+        for reference_image, distorted_image, ground_truth_score in self.validation_loader:
+            reference_image = reference_image.to(self.device)
+            distorted_image = distorted_image.to(self.device)
+            ground_truth_score = ground_truth_score.to(self.device)
 
-                running_loss += loss.item()
-                batch_count += 1
+            prediction_score: Tensor = self.model(reference_image, distorted_image)
+            loss: Tensor = self.loss_function(prediction_score, ground_truth_score)
 
-        return running_loss / max(batch_count, 1)
+            running_loss += loss.item()
+            batch_count += 1
+
+            predicted_batch_values: list[float] = (
+                prediction_score
+                .view(-1)
+                .detach()
+                .cpu()
+                .tolist()
+            )
+
+            ground_truth_batch_values: list[float] = (
+                ground_truth_score
+                .view(-1)
+                .detach()
+                .cpu()
+                .tolist()
+            )
+
+            all_predicted_scores.extend(predicted_batch_values)
+            all_ground_truth_scores.extend(ground_truth_batch_values)
+
+        average_loss = running_loss / max(batch_count, 1)
+
+        correlation_metrics = compute_correlations(
+            ground_truth_scores=all_ground_truth_scores,
+            predicted_scores=all_predicted_scores,
+            apply_nonlinear_regression_for_plcc=True
+        )
+
+        return average_loss, correlation_metrics
 
 
-    def check_checkpoint_save_due(self, epoch) -> dict[str, bool]:
+    def check_checkpoint_save_due(self) -> dict[str, bool]:
         save_checkpoint_triggers: dict[str, bool] = {
             'save_every_n_epochs': False,
             'save_last_epoch': False,
             'save_best_epoch': False
         }
 
-        if (self.config['checkpointing']['save_every_n_epochs'] > 0 and
-            epoch % self.config['checkpointing']['save_every_n_epochs'] == 0):
+        if (
+                self.config['checkpointing']['save_every_n_epochs'] > 0 and
+                self.last_epoch.epoch % self.config['checkpointing']['save_every_n_epochs'] == 0
+        ):
             save_checkpoint_triggers['save_every_n_epochs'] = True
 
         if self.config['checkpointing']['save_last_epoch']:
             save_checkpoint_triggers['save_last_epoch'] = True
 
-        # TODO: Dodać zapisywanie najlepszej epoki, a co za tym idzie również możliwość ich porównywania
         if self.config['checkpointing']['save_best_epoch']:
-            ...
+            last_srcc = self.last_epoch.validation_correlation.srcc
+            best_srcc = self.best_epoch.validation_correlation.srcc
+            min_delta = self.best_min_delta
+
+            if  last_srcc > best_srcc + min_delta:
+                self.best_epoch = self.last_epoch
+
+                save_checkpoint_triggers['save_best_epoch'] = True
 
         return save_checkpoint_triggers
 
 
     def save_checkpoint(
             self,
-            epoch: int,
-            train_loss: float,
-            validation_loss: float,
-            save_triggers: dict[str, bool]
+            save_triggers: dict[str, bool],
     ) -> None:
         """
         Zapisuje wagi modelu do pliku.
@@ -171,48 +216,69 @@ class Trainer:
 
             save_triggers['save_last_epoch'] = True
 
-        checkpoint = {
-            'epoch': epoch,
+        checkpoint_dict = {
             'model_state_dict': self.model.state_dict(),
             'optimizer_state_dict': self.optimizer.state_dict(),
-            'train_loss': train_loss,
-            'validation_loss': validation_loss
+            'last_epoch': self.last_epoch,
+            'best_epoch': self.best_epoch,
+            'config': self.config
         }
 
         print(f"[Trainer] Zapisano checkpoint do:")
 
         if save_triggers['save_every_n_epochs']:
-            epoch_checkpoint_path = self.checkpoints_path / f"epoch_{epoch}.pth"
-            torch.save(checkpoint, epoch_checkpoint_path)
+            epoch_checkpoint_path = self.checkpoints_path / f"epoch_{self.last_epoch.epoch}.pth"
+            torch.save(checkpoint_dict, epoch_checkpoint_path)
 
             print(f"    {epoch_checkpoint_path}")
 
         if save_triggers['save_last_epoch']:
             last_checkpoint_path = self.checkpoints_path / 'last.pth'
-            torch.save(checkpoint, last_checkpoint_path)
+            torch.save(checkpoint_dict, last_checkpoint_path)
 
             print(f"    {last_checkpoint_path}")
 
         if save_triggers['save_best_epoch']:
             best_checkpoint_path = self.checkpoints_path / 'best.pth'
-            torch.save(checkpoint, best_checkpoint_path)
+            torch.save(checkpoint_dict, best_checkpoint_path)
 
             print(f"    {best_checkpoint_path}")
 
 
+    def get_best_checkpoint(self) -> CheckpointPickle | None:
+        best_checkpoint_path = self.checkpoints_path / 'best.pth'
+
+        if not best_checkpoint_path.exists() or not best_checkpoint_path.is_file():
+            return None
+
+        return load_checkpoint_pickle(
+            checkpoint_path=best_checkpoint_path,
+            device=self.device,
+            check_consistency=True
+        )
+
+
     def load_checkpoint(self, checkpoint_path: Path) -> int:
-        checkpoint = load_checkpoint_pickle(
+        checkpoint_pickle = load_checkpoint_pickle(
             checkpoint_path=checkpoint_path,
             device=self.device,
             check_consistency=True
         )
 
-        self.model.load_state_dict(checkpoint['model_state_dict'])
-        self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        checkpoint_name = checkpoint_path.name
+        if checkpoint_name != 'best.pth':
+            best_checkpoint_pickle = self.get_best_checkpoint()
+        else:
+            best_checkpoint_pickle = checkpoint_pickle
 
-        start_epoch = checkpoint['epoch'] + 1
+        self.best_epoch = best_checkpoint_pickle.best_epoch
 
-        print(f"\n[Trainer] Wczytano checkpoint z {checkpoint['epoch']}. epoki (kontynuacja od {start_epoch}. epoki).")
+        self.model.load_state_dict(checkpoint_pickle.model_state_dict)
+        self.optimizer.load_state_dict(checkpoint_pickle.optimizer_state_dict)
+
+        start_epoch = checkpoint_pickle.last_epoch.epoch + 1
+
+        print(f"\n[Trainer] Wczytano checkpoint z {checkpoint_pickle.last_epoch.epoch}. epoki (kontynuacja od {start_epoch}. epoki).")
 
         return start_epoch
 
@@ -313,27 +379,37 @@ class Trainer:
             print(f"\n[Trainer] Startowanie treningu dla {num_of_epochs} epok...")
 
         for epoch in range(start_epoch, num_of_epochs+1):
+            self.last_epoch.epoch = epoch
+
             print(f"\n[Trainer] Rozpoczęto trening {epoch}. epoki.")
 
             train_loss = self.train_one_epoch()
-            validation_loss = self.validate_last_epoch()
+            validation_loss, validation_correlation = self.validate_last_epoch()
+
+            self.last_epoch.train_loss = LossMetrics(mse=train_loss)
+            self.last_epoch.validation_loss = LossMetrics(mse=validation_loss)
+            self.last_epoch.validation_correlation = validation_correlation
 
             if self.log_writer:
                 self.log_writer.add_scalar('loss/train', train_loss, epoch)
                 self.log_writer.add_scalar('loss/validation', validation_loss, epoch)
+                self.log_writer.add_scalar('correlation/plcc', validation_correlation.plcc, epoch)
+                self.log_writer.add_scalar('correlation/srcc', validation_correlation.srcc, epoch)
+                self.log_writer.add_scalar('correlation/krcc', validation_correlation.krcc, epoch)
 
             print(
                 f"[Trainer] Ukończono trening epoki {epoch} / {num_of_epochs}    "
                 f"|    Błąd trenowania: {train_loss:.4f}    "
-                f"|    Błąd walidacji: {validation_loss:.4f}"
+                f"|    Błąd walidacji: {validation_loss:.4f}    "
+                f"|    PLCC: {validation_correlation.plcc:.4f}    "
+                f"|    SRCC: {validation_correlation.srcc:.4f}    "
+                f"|    KRCC: {validation_correlation.krcc:.4f}"
             )
 
-            save_checkpoint_triggers = self.check_checkpoint_save_due(epoch=epoch)
+            save_checkpoint_triggers = self.check_checkpoint_save_due()
+
             if any(save_checkpoint_triggers.values()):
-                self.save_checkpoint(epoch=epoch,
-                                     train_loss=train_loss,
-                                     validation_loss=validation_loss,
-                                     save_triggers=save_checkpoint_triggers)
+                self.save_checkpoint(save_triggers=save_checkpoint_triggers)
 
         if start_epoch <= num_of_epochs:
             print(f"\n[Trainer] Cały trening zakończony!\n"
