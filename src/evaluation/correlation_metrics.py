@@ -16,9 +16,25 @@ def _five_parameter_logistic_function(
     beta_4: float,
     beta_5: float,
 ) -> np.ndarray:
-    # Klasyczna postać spotykana w pracach IQA / benchmarkach.
-    # Zapis poniżej jest stabilny numerycznie dla typowych zakresów danych.
-    return beta_2 + (beta_1 - beta_2) / (1.0 + np.exp(-(predicted_scores - beta_3) / (np.abs(beta_4) + 1e-12))) + beta_5 * predicted_scores
+    # 5-parametrowa funkcja logistyczna zgodna z podejściem Sheikha (IQA):
+    #
+    #     p(x, β) = β1 * ( 1/2 - 1 / (1 + exp( β2 * (x - β3) )) ) + β4 * x + β5
+    #
+    # gdzie:
+    #   - x     : surowy wynik modelu / metryki jakości (predicted_scores)
+    #   - β1    : skala (amplituda) części logistycznej
+    #   - β2    : stromość (i znak monotoniczności) części logistycznej
+    #   - β3    : przesunięcie w osi x (punkt "środka" sigmoidy)
+    #   - β4    : człon liniowy (trend) – poprawia dopasowanie, gdy sama logistyka jest zbyt "sztywna"
+    #   - β5    : przesunięcie w osi y (bias / offset)
+    #
+    # Uwaga numeryczna:
+    #   exp(·) łatwo przepełnia się dla dużych argumentów, więc przycinamy argument wykładnika.
+    exponent_argument = beta_2 * (predicted_scores - beta_3)
+    exponent_argument = np.clip(exponent_argument, -60.0, 60.0)
+
+    logistic_core = 0.5 - (1.0 / (1.0 + np.exp(exponent_argument)))
+    return beta_1 * logistic_core + beta_4 * predicted_scores + beta_5
 
 
 def _apply_nonlinear_regression(
@@ -62,39 +78,55 @@ def _apply_nonlinear_regression(
     predicted_max = float(np.max(predicted_scores))
     predicted_median = float(np.median(predicted_scores))
 
-    # Typowe heurystyki startowe:
-    # beta_1, beta_2 ustawiają początek i koniec skali ground-truth,
-    # beta_3 to przesunięcie (środek), beta_4 to "szerokość", beta_5 to mały trend liniowy
+    # Typowe heurystyki startowe (dla funkcji Sheikha):
+    #   - beta_1: skala części logistycznej (logistic_core ma zakres ~[-0.5, 0.5])
+    #   - beta_2: stromość – rozsądny start to ~ 1 / std(predicted_scores)
+    #   - beta_3: środek sigmoidy – startujemy od mediany predykcji
+    #   - beta_4: trend liniowy – zwykle mały (0.0)
+    #   - beta_5: offset – startujemy od średniej ground truth
+    ground_truth_range = ground_truth_max - ground_truth_min
+
     initial_parameters = np.array(
         [
-            ground_truth_max,                               # beta_1
-            ground_truth_min,                               # beta_2
-            predicted_median,                               # beta_3
-            (predicted_max - predicted_min) / 4.0 + 1e-6,   # beta_4
-            0.0,                                            # beta_5
+            2.0 * ground_truth_range if ground_truth_range > 0.0 else 1.0,  # beta_1
+            1.0 / (predicted_standard_deviation + 1e-6),                    # beta_2
+            predicted_median,                                               # beta_3
+            0.0,                                                            # beta_4
+            ground_truth_mean,                                              # beta_5
         ],
         dtype=np.float64,
     )
 
-    # Ograniczenia - pomagają przy konwergencji
+    # Ograniczenia - pomagają przy konwergencji i ograniczają "szalone" dopasowania.
+    #
+    # Celowo ustawiamy dość szerokie przedziały:
+    #   - beta_1 może być dodatnie lub ujemne (odwrócenie skali), ale typowo jego rząd wielkości
+    #     nie powinien być ogromny w porównaniu do rozpiętości ground truth.
+    #   - beta_2 (stromość) może być dodatnie lub ujemne; duże wartości nadal są bezpieczne
+    #     dzięki przycinaniu argumentu exp() w funkcji logistycznej.
+    #   - beta_3 trzymamy w zakresie obserwowanych predykcji.
+    #   - beta_4 to trend liniowy – szeroko, ale bez przesady.
+    #   - beta_5 to przesunięcie (offset) – zakres oparty o ground truth.
+    beta_1_abs_bound = max(10.0 * ground_truth_range, 1e-6)
+
     lower_bounds = np.array(
         [
-            ground_truth_min - 2.0 * abs(ground_truth_min),  # beta_1
-            ground_truth_min - 2.0 * abs(ground_truth_min),  # beta_2
-            predicted_min,                                   # beta_3
-            1e-8,                                            # beta_4 (musi być dodatni, bo stoi w mianowniku)
-            -10.0,                                           # beta_5
+            -beta_1_abs_bound,                                 # beta_1
+            -200.0,                                            # beta_2
+            predicted_min,                                     # beta_3
+            -10.0,                                             # beta_4
+            ground_truth_min - 2.0 * abs(ground_truth_min),     # beta_5
         ],
         dtype=np.float64,
     )
 
     upper_bounds = np.array(
         [
-            ground_truth_max + 2.0 * abs(ground_truth_max),  # beta_1
-            ground_truth_max + 2.0 * abs(ground_truth_max),  # beta_2
-            predicted_max,                                   # beta_3
-            (predicted_max - predicted_min) * 10.0 + 1e-6,   # beta_4
-            10.0,                                            # beta_5
+            beta_1_abs_bound,                                  # beta_1
+            200.0,                                             # beta_2
+            predicted_max,                                     # beta_3
+            10.0,                                              # beta_4
+            ground_truth_max + 2.0 * abs(ground_truth_max),    # beta_5
         ],
         dtype=np.float64,
     )
@@ -119,8 +151,7 @@ def _apply_nonlinear_regression(
 
 def compute_correlations(
         ground_truth_scores: Iterable[float],
-        predicted_scores: Iterable[float],
-        apply_nonlinear_regression_for_plcc: bool = True
+        predicted_scores: Iterable[float]
 ) -> CorrelationMetrics:
     ground_truth_array = np.asarray(ground_truth_scores, dtype=np.float64)
     predicted_array = np.asarray(predicted_scores, dtype=np.float64)
@@ -129,13 +160,10 @@ def compute_correlations(
         raise ValueError('Error: Tablica z etykietami i tablica z predykcjami muszą mieć ten sam rozmiar!')
 
     # PLCC
-    if apply_nonlinear_regression_for_plcc:
-        predicted_array_for_plcc = _apply_nonlinear_regression(
-            ground_truth_array,
-            predicted_array
-        )
-    else:
-        predicted_array_for_plcc = predicted_array
+    predicted_array_for_plcc = _apply_nonlinear_regression(
+        ground_truth_array,
+        predicted_array
+    )
 
     plcc_value, _ = pearsonr(predicted_array_for_plcc, ground_truth_array)
 

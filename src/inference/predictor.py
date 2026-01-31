@@ -44,13 +44,13 @@ class Predictor:
             embedding_dimension=config['model']['embedding_dimension']
         ).to(self.device)
 
-        checkpoint = load_checkpoint_pickle(
+        checkpoint_pickle = load_checkpoint_pickle(
             checkpoint_path=checkpoint_path,
             device=self.device,
             check_consistency=True
         )
 
-        self.model.load_state_dict(checkpoint['model_state_dict'])
+        self.model.load_state_dict(checkpoint_pickle.model_state_dict)
         self.model.to(self.device)
         self.model.eval()
 

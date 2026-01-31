@@ -13,10 +13,7 @@ def main() -> None:
         checkpoint_name='last.pth'
     )
 
-    evaluator.evaluate(
-        apply_nonlinear_regression_for_plcc=True,
-        save_outputs=True
-    )
+    evaluator.evaluate(save_outputs=True)
 
 
 if __name__ == '__main__':

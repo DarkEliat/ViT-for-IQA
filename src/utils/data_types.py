@@ -1,6 +1,5 @@
 from typing import TypedDict, Any, Literal
-from dataclasses import dataclass
-
+from dataclasses import dataclass, field
 
 from torch import Tensor
 
@@ -68,10 +67,10 @@ class EvaluationResults:
 
 @dataclass
 class CheckpointInfo:
-    epoch: int = 0
-    train_loss: LossMetrics = LossMetrics()
-    validation_loss: LossMetrics = LossMetrics()
-    validation_correlation: CorrelationMetrics = CorrelationMetrics()
+    epoch: int = field(default=0)
+    train_loss: LossMetrics = field(default_factory=LossMetrics)
+    validation_loss: LossMetrics = field(default_factory=LossMetrics)
+    validation_correlation: CorrelationMetrics = field(default_factory=CorrelationMetrics)
 
 
 StateDict = dict[str, Tensor]

@@ -17,7 +17,11 @@ def load_checkpoint_pickle(
             f"Ścieżka: {checkpoint_path}"
         )
 
-    checkpoint_dict = torch.load(checkpoint_path, map_location=device)
+    checkpoint_dict = torch.load(
+        checkpoint_path,
+        map_location=device,
+        weights_only=False
+    )
 
     if check_consistency:
         _check_checkpoint_dict_consistency(

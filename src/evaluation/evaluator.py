@@ -28,6 +28,7 @@ class Evaluator:
         self.splits_path = experiment_path / 'splits/'
         self.metrics_json_path = experiment_path / 'metrics.json'
         self.metrics_csv_path = experiment_path / 'metrics.csv'
+        self.metrics_md_path = experiment_path / 'metrics.md'
         self.summary_md_path = experiment_path / 'summary.md'
 
         self.predictor = Predictor(
@@ -64,7 +65,7 @@ class Evaluator:
             f"    Nazwa configu: `{self.config_name}`\n"
             f"    Batch size: {self.batch_size}\n"
             f"    Device: `{self.device}`\n"
-            f"    Number of workers: {self.num_of_workers}\n"
+            f"    Number of workers: {self.num_of_workers}"
         )
 
         self.data_loader = build_split_data_loader(
@@ -77,23 +78,17 @@ class Evaluator:
 
 
     @torch.no_grad()
-    def evaluate(
-            self,
-            apply_nonlinear_regression_for_plcc: bool = True,
-            save_outputs: bool = True
-    ):
+    def evaluate(self, save_outputs: bool):
         print('\n[Evaluator] Rozpoczęto ewaluację...')
 
         ground_truth_scores, predicted_scores = self.predictor.predict_with_ground_truth(
             data_loader=self.data_loader,
-            enable_debug_batch_difference=False,
         )
 
         # Metryki korelacyjne IQA
         correlation_metrics: CorrelationMetrics = compute_correlations(
             ground_truth_scores=ground_truth_scores,
             predicted_scores=predicted_scores,
-            apply_nonlinear_regression_for_plcc=apply_nonlinear_regression_for_plcc
         )
 
         # Metryki błędu (pomocnicze)
@@ -103,7 +98,7 @@ class Evaluator:
         if ground_truth_array.shape != predicted_array.shape:
             raise RuntimeError(
                 f"Error: Niezgodność rozmiarów tablic!\n"
-                f"    ground_truth_array.shape={ground_truth_array}\n"
+                f"    ground_truth_array.shape={ground_truth_array.shape}\n"
                 f"    predicted_array.shape={predicted_array.shape}\n"
                 f"    To nie powinno się wydarzyć, jeśli data_loader i predykcje działają poprawnie."
             )
@@ -131,12 +126,12 @@ class Evaluator:
 
         print(
             f"\n[Evaluator] Ukończono ewaluację:\n"
-            f"    PLCC: {results.plcc:.6f}\n"
-            f"    SRCC: {results.srcc:.6f}\n"
-            f"    KRCC: {results.krcc:.6f}\n"
-            f"    MSE: {results.mse:.6f}\n"
-            f"    RMSE: {results.rmse:.6f}\n"
-            f"    MAE: {results.mae:.6f}\n"
+            f"    PLCC: {results.correlation.plcc:.6f}\n"
+            f"    SRCC: {results.correlation.srcc:.6f}\n"
+            f"    KRCC: {results.correlation.krcc:.6f}\n"
+            f"    MSE: {results.loss.mse:.6f}\n"
+            f"    RMSE: {results.loss.rmse:.6f}\n"
+            f"    MAE: {results.loss.mae:.6f}\n"
             f"    Liczba próbek: {results.num_of_samples}\n"
         )
 
@@ -149,7 +144,7 @@ class Evaluator:
     def _save_results(self, results: EvaluationResults) -> None:
         self._save_results_to_json(results=results, output_path=self.metrics_json_path)
         self._save_results_to_csv(results=results, output_path=self.metrics_csv_path)
-        self._save_results_to_markdown(results=results, output_path=self.summary_md_path)
+        self._save_results_to_markdown(results=results, output_path=self.metrics_md_path)
 
         print(
             f"\n[Evaluator] Zapisano wyniki ewaluacji do:\n"
@@ -212,33 +207,3 @@ class Evaluator:
 
         with open(output_path, 'w', encoding='utf-8') as markdown_file:
             markdown_file.write('\n'.join(markdown_lines))
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

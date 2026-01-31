@@ -1,3 +1,4 @@
+from copy import deepcopy
 from pathlib import Path
 
 import torch
@@ -166,7 +167,6 @@ class Trainer:
         correlation_metrics = compute_correlations(
             ground_truth_scores=all_ground_truth_scores,
             predicted_scores=all_predicted_scores,
-            apply_nonlinear_regression_for_plcc=True
         )
 
         return average_loss, correlation_metrics
@@ -194,8 +194,7 @@ class Trainer:
             min_delta = self.best_min_delta
 
             if  last_srcc > best_srcc + min_delta:
-                self.best_epoch = self.last_epoch
-
+                self.best_epoch = deepcopy(self.last_epoch)
                 save_checkpoint_triggers['save_best_epoch'] = True
 
         return save_checkpoint_triggers
@@ -286,7 +285,7 @@ class Trainer:
     def any_checkpoint_exists(self):
         if not self.checkpoints_path.exists() or not self.checkpoints_path.is_dir():
             raise FileNotFoundError(
-                f"Error: Nie istnieje folder checkpointów"
+                f"Error: Nie istnieje folder checkpointów\n"
                 f"Ścieżka: {self.checkpoints_path}"
             )
 
