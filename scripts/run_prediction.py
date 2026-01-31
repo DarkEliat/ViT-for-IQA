@@ -1,26 +1,6 @@
-from pathlib import Path
-from pprint import pprint
-
-from src.inference.predictor import Predictor
-from src.utils.paths import (
-    EXPERIMENTS_KADID10K_PATH,
-    EXPERIMENTS_TID2008_PATH,
-    EXPERIMENTS_TID2013_PATH,
-    EXPERIMENTS_LIVE_PATH
-)
-
-
-def main() -> None:
-    predictor = Predictor(
-        experiment_path=(EXPERIMENTS_LIVE_PATH / 'test/'),
-        checkpoint_name='last.pth'
-    )
-
-    predicted_quality_scores = predictor.predict_on_training_dataset()
-
-    print()
-    pprint(predicted_quality_scores)
+from src.cli.entrypoint import run_cli_command
+from src.cli.run_prediction_cli import PredictionCliCommand
 
 
 if __name__ == '__main__':
-    main()
+    run_cli_command(PredictionCliCommand())

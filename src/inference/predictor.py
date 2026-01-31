@@ -6,7 +6,8 @@ from torch.utils.data import DataLoader
 from src.models.vit_regressor import VitRegressor
 from src.utils.checkpoints import load_checkpoint_pickle
 from src.utils.configs import load_config
-from src.datasets.factory import build_all_data_loader
+from src.datasets.factory import build_data_loader
+from src.utils.data_types import SplitName
 
 
 class Predictor:
@@ -23,19 +24,32 @@ class Predictor:
                 f"Ścieżka: {experiment_path}"
             )
 
+        self.experiment_path = experiment_path
+
         config_path = experiment_path / 'config.yaml'
         checkpoint_path = experiment_path / 'checkpoints' / checkpoint_name
+        self.checkpoint_path = checkpoint_path
 
         config = load_config(config_path=config_path, check_consistency=True)
+
+        config['training']['batch_size'] = (
+            batch_size_override
+            if batch_size_override
+            else config['training']['batch_size']
+        )
+        config['training']['num_of_workers'] = (
+            num_of_workers_override
+            if num_of_workers_override
+            else config['training']['batch_size']
+        )
+
         self.config = config
 
         print(
             f"\n[Predictor] Rozpoczęto ładowanie checkpointu:\n"
-            f"    Ścieżka checkpointu: {checkpoint_name}\n"
+            f"    Nazwa checkpointu: {checkpoint_name}\n"
             f"    Nazwa configu: `{self.config['config_name']}`"
         )
-
-        self.training_dataset_name = config['dataset']['name']
 
         self.device = config['training']['device']
 
@@ -56,7 +70,6 @@ class Predictor:
 
         print('\n[Predictor] Załadowano checkpoint!')
 
-        self.training_data_loader = build_all_data_loader(config=self.config)
 
     @torch.no_grad()
     def predict(self, data_loader: DataLoader) -> list[float]:
@@ -96,12 +109,12 @@ class Predictor:
         ground_truth_scores: list[float] = []
         predicted_scores: list[float] = []
 
-        for reference_image_tensor, distorted_image_tensor, ground_truth_tensor in data_loader:
-            reference_image_tensor = reference_image_tensor.to(self.device)
-            distorted_image_tensor = distorted_image_tensor.to(self.device)
-            ground_truth_tensor = ground_truth_tensor.to(self.device)
+        for reference_image, distorted_image, ground_truth_score in data_loader:
+            reference_image = reference_image.to(self.device)
+            distorted_image = distorted_image.to(self.device)
+            ground_truth_score = ground_truth_score.to(self.device)
 
-            model_output_tensor = self.model(reference_image_tensor, distorted_image_tensor)
+            model_output_tensor = self.model(reference_image, distorted_image)
 
             predicted_batch_values: list[float] = (
                 model_output_tensor
@@ -112,7 +125,7 @@ class Predictor:
             )
 
             ground_truth_batch_values: list[float] = (
-                ground_truth_tensor
+                ground_truth_score
                 .view(-1)
                 .detach()
                 .cpu()
@@ -126,9 +139,15 @@ class Predictor:
 
 
     @torch.no_grad()
-    def predict_on_training_dataset(self) -> list[float]:
+    def predict_on_training_dataset(self, split_name: SplitName = 'full') -> list[float]:
         print('\n[Predictor] Rozpoczęto predykcję na całym datasetcie, na którym szkolony był model...')
 
-        predicted_quality_scores = self.predict(data_loader=self.training_data_loader)
+        training_data_loader = build_data_loader(
+            config=self.config,
+            split_name=split_name,
+            experiment_path=self.experiment_path,
+        )
+
+        predicted_quality_scores = self.predict(data_loader=training_data_loader)
 
         return predicted_quality_scores

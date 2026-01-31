@@ -10,8 +10,6 @@ def resize(image: Image.Image,
 
     target_width, target_height = target_size
 
-    scale_factors = (0, 0)
-
     if keep_aspect_ratio:
         lower_scale_factor = min(
             target_width / original_width,

@@ -1,8 +1,7 @@
 from abc import abstractmethod, ABC
 from pathlib import Path
-from typing import Any, Generic, TypeVar
+from typing import Generic, TypeVar
 
-import pandas as pd
 import torch
 from PIL import Image
 from torch.utils.data import Dataset as TorchDataset

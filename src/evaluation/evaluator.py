@@ -8,7 +8,7 @@ import torch
 from src.evaluation.correlation_metrics import CorrelationMetrics, compute_correlations
 from src.inference.predictor import Predictor
 from src.utils.data_types import SplitName, EvaluationResults, LossMetrics
-from src.datasets.factory import build_split_data_loader
+from src.datasets.factory import build_data_loader
 
 
 class Evaluator:
@@ -68,7 +68,7 @@ class Evaluator:
             f"    Number of workers: {self.num_of_workers}"
         )
 
-        self.data_loader = build_split_data_loader(
+        self.data_loader = build_data_loader(
             config=self.config,
             split_name=split_name,
             experiment_path=experiment_path

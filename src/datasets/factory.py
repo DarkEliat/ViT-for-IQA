@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import get_args
 
 from torch.utils.data import Dataset as TorchDataset, DataLoader, Subset
 
@@ -24,18 +25,11 @@ def build_dataset(config: Config) -> TorchDataset | BaseDataset:
             raise ValueError(f"Error: Niewspierany typ bazy danych: `{config['dataset']['name']}`!")
 
 
-def build_all_data_loader(config: Config) -> DataLoader:
-    if (
-            not 'dataset' in config
-            or
-            not 'name' in config['dataset']
-    ):
-        raise KeyError(
-            'Error: Przekazana konfiguracja nie zawiera informacji o nazwie datasetu!\n'
-            'Sprawdź spójność wcześniej załadowanego pliku konfiguracyjnego YAML...'
-        )
-
-    print(f"\nŁadowanie datasetu `{config['dataset']['name']}`...\n"
+def build_full_data_loader(
+        config: Config,
+        shuffle: bool = False
+) -> DataLoader:
+    print(f"\nŁadowanie całego datasetu `{config['dataset']['name']}`...\n"
           f"    To może potrwać nawet do kilku minut...")
 
     dataset: TorchDataset = build_dataset(config=config)
@@ -43,7 +37,7 @@ def build_all_data_loader(config: Config) -> DataLoader:
     data_loader = DataLoader(
         dataset,
         batch_size=config['training']['batch_size'],
-        shuffle=False,
+        shuffle=shuffle,
         num_workers=config['training']['num_of_workers']
     )
 
@@ -93,8 +87,37 @@ def build_split_data_loader(
     data_loader = DataLoader(
         subset_dataset,
         batch_size=config['training']['batch_size'],
-        shuffle=False,
+        shuffle=shuffle,
         num_workers=config['training']['num_of_workers']
     )
 
     return data_loader
+
+
+def build_data_loader(
+        config: Config,
+        split_name: SplitName,
+        experiment_path: Path,
+        shuffle: bool = False
+) -> DataLoader:
+    available_split_names = list(get_args(SplitName))
+
+    if split_name not in available_split_names:
+        raise ValueError(
+            f"Error: Split o nazwie `{split_name}` nie jest dostępny!\n"
+            f"Spróbuj ponownie z jednym z poniższych:\n"
+            f"{available_split_names}"
+        )
+
+    if split_name == 'full':
+        return build_full_data_loader(
+            config=config,
+            shuffle=shuffle
+        )
+    else:
+        return build_split_data_loader(
+            config=config,
+            split_name=split_name,
+            experiment_path=experiment_path,
+            shuffle=shuffle
+        )

@@ -51,7 +51,7 @@ class LossMetrics:
     mae: float = float('inf')
 
 
-SplitName = Literal['train', 'validation', 'test']
+SplitName = Literal['train', 'validation', 'test', 'full']
 
 @dataclass(frozen=True)
 class EvaluationResults:

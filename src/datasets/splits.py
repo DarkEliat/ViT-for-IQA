@@ -74,8 +74,6 @@ def generate_split(
         test_reference_count = num_of_reference_images - train_reference_count - validation_reference_count
 
     if test_reference_count == 0:
-        test_reference_count = 1
-
         # Redukcja train split (o ile to możliwe), w przeciwnym wypadku redukcja validation split
         if train_reference_count > 1:
             train_reference_count -= 1
@@ -89,8 +87,6 @@ def generate_split(
     validation_reference_start = train_reference_count
     validation_reference_end = train_reference_count + validation_reference_count
     validation_reference_names = set(all_reference_image_names[validation_reference_start : validation_reference_end])
-
-    test_reference_names = set(all_reference_image_names[validation_reference_end :])
 
     # Dokonanie podziału obrazów zniekształconych na splity na podstawie podziału obrazów referencyjnych
     train_distorted_indices: list[int] = []

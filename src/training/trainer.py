@@ -11,7 +11,7 @@ from src.evaluation.correlation_metrics import CorrelationMetrics, compute_corre
 from src.models.vit_regressor import VitRegressor
 from src.utils.checkpoints import load_checkpoint_pickle
 from src.utils.configs import load_config
-from src.datasets.factory import build_split_data_loader
+from src.datasets.factory import build_data_loader
 from src.utils.data_types import LossMetrics, CheckpointInfo, CheckpointPickle
 
 
@@ -22,7 +22,6 @@ class Trainer:
                 f"Error: Wskazany eksperyment nie istnieje!"
                 f"Ścieżka: {experiment_path}"
             )
-
 
         self.experiment_name = experiment_path.name
 
@@ -78,12 +77,12 @@ class Trainer:
         print('\n[Trainer] Załadowano eksperyment!')
 
         # Data Loadery
-        self.train_loader = build_split_data_loader(
+        self.train_loader = build_data_loader(
             config=config,
             split_name='train',
             experiment_path=experiment_path
         )
-        self.validation_loader = build_split_data_loader(
+        self.validation_loader = build_data_loader(
             config=config,
             split_name='validation',
             experiment_path=experiment_path
@@ -94,7 +93,6 @@ class Trainer:
         """
         Wykonuje jedną epokę szkolenia.
         """
-
         self.model.train()
 
         running_loss = 0.0
@@ -264,11 +262,13 @@ class Trainer:
             check_consistency=True
         )
 
+        best_checkpoint_pickle = checkpoint_pickle
+
         checkpoint_name = checkpoint_path.name
         if checkpoint_name != 'best.pth':
-            best_checkpoint_pickle = self.get_best_checkpoint()
-        else:
-            best_checkpoint_pickle = checkpoint_pickle
+            another_checkpoint_pickle = self.get_best_checkpoint()
+
+            best_checkpoint_pickle = another_checkpoint_pickle or checkpoint_pickle
 
         self.best_epoch = best_checkpoint_pickle.best_epoch
 
@@ -311,8 +311,8 @@ class Trainer:
                 '\nWARNING: [Trainer] Znaleziono checkpoint `last.pth`.\n'
                 '    Jednocześnie parametr konfiguracyjny `checkpointing.save_last_epoch` jest ustawiony na `false`.\n'
                 '    Oznacza to, że przy aktualnej konfiguracji wskazany checkpoint nie mógł powstać.\n'
-                '    Jeśli celowo umieściłeś plik `last.pth` w folderze `checkpoints\n'
-                '    i jesteś pewien, że chcesz kontynuować trening, to wpisz [y / Y / t / T].\n'
+                '    Jeśli celowo umieściłeś plik `last.pth` w folderze `checkpoints/` i\n'
+                '    jesteś pewien, że chcesz kontynuować trening, to wpisz [y / Y / t / T].\n'
                 '    Jeśli nie chcesz kontynuować, to przerwij działanie programu albo wpisz [n / N].'
             )
 
@@ -340,9 +340,9 @@ class Trainer:
         elif init_checkpoint_exist:
             print(
                 '\nWARNING: [Trainer] Znaleziono checkpoint `init.pth`.\n'
-                '    Jeśli stworzyłeś cały ten eksperyment na podstawie checkpointu z innego eksperymentu\n'
-                '    albo celowo umieściłeś plik `init.pth` w folderze `checkpoints/ jako pretrenowany model`\n'
-                '    i jesteś pewien, że chcesz kontynuować trening, to wpisz [y / Y / t / T].\n'
+                '    Jeśli stworzyłeś cały ten eksperyment na podstawie checkpointu z innego eksperymentu albo\n'
+                '    celowo umieściłeś plik `init.pth` w folderze `checkpoints/` jako pretrenowany model i\n'
+                '    jesteś pewien, że chcesz kontynuować trening, to wpisz [y / Y / t / T].\n'
                 '    Jeśli nie chcesz kontynuować, to przerwij działanie programu albo wpisz [n / N].'
             )
 
@@ -366,7 +366,7 @@ class Trainer:
 
         return 0
 
-    def train(self, resume_from: Path | None = None) -> None:
+    def train(self) -> None:
         num_of_epochs = self.config['training']['num_of_epochs']
         start_epoch = 1
 
@@ -417,4 +417,4 @@ class Trainer:
             print(f"\n[Trainer] Nie można przeprowadzić treningu, ponieważ numer startowej epoki ({start_epoch})\n"
                   f"    jest większy niż maksymalna liczba epok treningu ({num_of_epochs}) w pliku konfiguracyjnym YAML eksperymentu.")
 
-        input('Naciśnij Enter, aby zakończyć...')
+        input('\nNaciśnij Enter, aby zakończyć...')
