@@ -95,6 +95,7 @@ def create_experiment(
         experiment_path / 'logs' / 'train.log',
         experiment_path / 'metrics.csv',
         experiment_path / 'metrics.json',
+        experiment_path / 'metrics.md',
         experiment_path / 'summary.md'
     ]
 

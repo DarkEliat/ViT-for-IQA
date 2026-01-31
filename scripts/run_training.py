@@ -8,7 +8,7 @@ from src.utils.paths import (
 
 
 def main() -> None:
-    trainer = Trainer(experiment_path=(EXPERIMENTS_TID2013_PATH / 'test'))
+    trainer = Trainer(experiment_path=(EXPERIMENTS_KADID10K_PATH / 'test'))
     trainer.train()
 
 
