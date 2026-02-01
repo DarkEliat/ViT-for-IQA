@@ -47,7 +47,8 @@ class Predictor:
 
         print(
             f"\n[Predictor] Rozpoczęto ładowanie checkpointu:\n"
-            f"    Nazwa checkpointu: {checkpoint_name}\n"
+            f"    Ścieżka eksperymentu: {experiment_path}\n"
+            f"    Nazwa checkpointu: `{checkpoint_name}`\n"
             f"    Nazwa configu: `{self.config['config_name']}`"
         )
 

@@ -10,7 +10,7 @@ from torchvision import transforms
 from src.datasets.file_map import FileMap
 from src.utils.data_types import Label, Config, UnifiedQualityScore
 from src.utils.image_preprocessing import resize
-from src.utils.paths import PROJECT_ROOT
+from src.utils.paths import PROJECT_ROOT_PATH
 
 
 LabelsContainerType = TypeVar('LabelsContainerType')
@@ -19,7 +19,7 @@ class BaseDataset(ABC, TorchDataset, Generic[LabelsContainerType]):
     def __init__(self, config):
         self._config = config
 
-        self._labels_path = PROJECT_ROOT / config['dataset']['labels_path']
+        self._labels_path = PROJECT_ROOT_PATH / config['dataset']['labels_path']
 
         self._reference_images_path = Path(config['dataset']['images']['reference']['path'])
         self._distorted_images_path = Path(config['dataset']['images']['distorted']['path'])

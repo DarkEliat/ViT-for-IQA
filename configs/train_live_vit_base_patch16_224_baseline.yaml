@@ -35,13 +35,13 @@ model:
     keep_original_aspect_ratio: true
   embedding_dimension: 768
   output:
-    type: "normalized_mos"
+    type: "unified_quality_score"
     min: 0
     max: 1
 
 training:
   quality_label:
-    type: "normalized_mos"
+    type: "unified_quality_score"
     min: 0
     max: 1
   splits:
@@ -50,7 +50,7 @@ training:
     test: 0.2
     random_seed: 42
   batch_size: 8
-  num_of_epochs: 5
+  num_of_epochs: 100
   early_stopping:
     enabled: false
     max_epochs_without_improvement: 5
@@ -61,7 +61,7 @@ training:
 
 checkpointing:
   enabled: true
-  save_every_n_epochs: 1
+  save_every_n_epochs: 20
   save_last_epoch: true
   save_best_epoch: true
 

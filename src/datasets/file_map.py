@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from src.utils.paths import PROJECT_ROOT
+from src.utils.paths import PROJECT_ROOT_PATH
 
 
 class FileMap:
@@ -17,7 +17,7 @@ class FileMap:
 
     @files_directory_path.setter
     def files_directory_path(self, new_directory_path: Path):
-        new_directory_path = PROJECT_ROOT / new_directory_path
+        new_directory_path = PROJECT_ROOT_PATH / new_directory_path
 
         if not new_directory_path or not new_directory_path.exists():
             raise FileNotFoundError(

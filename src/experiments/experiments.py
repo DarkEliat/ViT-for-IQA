@@ -46,7 +46,7 @@ def _create_directories(experiment_path: Path) -> None:
     ]
 
     for directory in directories:
-        directory.mkdir(parents=True, exist_ok=True)
+        directory.mkdir(parents=False, exist_ok=False)
 
 
 def _create_empty_files(experiment_path: Path) -> None:
@@ -126,6 +126,8 @@ def create_experiment(
 
         print(f"\nPoprawnie utworzono eksperyment `{experiment_name}`!")
 
+        return experiment_path
+
     except FileExistsError:
         raise FileExistsError(
             f'Error: Eksperyment `{experiment_name}` dla datasetu `{dataset_name}` już istnieje!\n'
@@ -143,5 +145,3 @@ def create_experiment(
 
     finally:
         print(f'Ścieżka: {experiment_path}\n')
-
-        return experiment_path

@@ -46,7 +46,6 @@ class EvaluationCliCommand(BaseCliCommand[EvaluationCliArgs]):
         checkpoint_name = parsed_namespace.checkpoint_name
 
         validate_split_name_arg(experiment_path=experiment_path, split_name=split_name)
-        resolve_checkpoint_path(experiment_path=experiment_path, checkpoint_name=checkpoint_name)
 
         return EvaluationCliArgs(
             experiment_path=experiment_path,

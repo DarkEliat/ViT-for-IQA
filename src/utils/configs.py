@@ -4,7 +4,7 @@ from typing import Any
 import yaml
 
 from src.utils.data_types import Config
-from src.utils.paths import PROJECT_ROOT
+from src.utils.paths import PROJECT_ROOT_PATH
 
 
 def load_config(config_path: Path, check_consistency: bool) -> Config:
@@ -143,7 +143,7 @@ def _check_dataset_section(dataset: dict[str, Any]) -> None:
 
 
     # --------------- images.reference.path ---------------
-    reference_images_path = PROJECT_ROOT / reference['path']
+    reference_images_path = PROJECT_ROOT_PATH / reference['path']
     if not reference_images_path.exists() or not reference_images_path.is_dir():
         raise FileNotFoundError(
             f"Error: `dataset.images.reference.path` nie istnieje lub nie jest katalogiem!\n"
@@ -169,7 +169,7 @@ def _check_dataset_section(dataset: dict[str, Any]) -> None:
     )
 
     # --------------- images.distorted.path ---------------
-    distorted_images_path = PROJECT_ROOT / distorted['path']
+    distorted_images_path = PROJECT_ROOT_PATH / distorted['path']
     if not distorted_images_path.exists() or not distorted_images_path.is_dir():
         raise FileNotFoundError(
             f"Error: `dataset.images.distorted.path` nie istnieje lub nie jest katalogiem!\n"
@@ -214,7 +214,7 @@ def _check_dataset_section(dataset: dict[str, Any]) -> None:
 
 
     # --------------- labels_path ---------------
-    labels_path = PROJECT_ROOT / dataset['labels_path']
+    labels_path = PROJECT_ROOT_PATH / dataset['labels_path']
     if not labels_path.exists() or not labels_path.is_file():
         raise FileNotFoundError(
             f"Error: `dataset.labels_path` nie istnieje lub nie jest plikiem!\n"
@@ -329,7 +329,7 @@ def _check_model_section(model: dict[str, Any]) -> None:
 
 
     # --------------- output.type ---------------
-    if output_config['type'] not in ('normalized_mos', 'inverted_normalized_dmos'):
+    if output_config['type'] != 'unified_quality_score':
         raise ValueError('Error: `model.output.type` musi mieć wartość `normalized_mos` albo `inverted_normalized_dmos`!')
 
 
@@ -518,12 +518,7 @@ def _check_cross_section_consistency(config: dict[str, Any]) -> None:
     model_output_type = config['model']['output']['type']
     training_quality_type = config['training']['quality_label']['type']
 
-    expected_output_type_by_dataset_label_type = {
-        'mos': 'normalized_mos',
-        'dmos': 'inverted_normalized_dmos',
-    }
-
-    expected_type = expected_output_type_by_dataset_label_type[dataset_quality_type]
+    expected_type = 'unified_quality_score'
 
     if model_output_type != expected_type:
         raise ValueError(
