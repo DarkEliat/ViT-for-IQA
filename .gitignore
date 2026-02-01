@@ -214,6 +214,7 @@ logs/
 **/logs/
 experiments/
 !experiments/.gitkeep
+!src/experiments/
 *.tfevents*
 
 # TODOs
