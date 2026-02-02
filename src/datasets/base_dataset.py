@@ -1,6 +1,6 @@
 from abc import abstractmethod, ABC
 from pathlib import Path
-from typing import Generic, TypeVar
+from typing import Generic, TypeVar, get_args
 
 import torch
 from PIL import Image
@@ -8,9 +8,10 @@ from torch.utils.data import Dataset as TorchDataset
 from torchvision import transforms
 
 from src.datasets.file_map import FileMap
-from src.utils.data_types import Label, UnifiedQualityScore, DatasetConfig, ModelConfig
+from src.utils.data_types import Label, UnifiedQualityScore, DatasetConfig, ModelConfig, QualityScoreType
 from src.utils.image_preprocessing import resize
 from src.utils.paths import PROJECT_ROOT_PATH
+from src.utils.quality_scores import normalize_min_max, dmos_to_unified_quality_score
 
 
 LabelsContainerType = TypeVar('LabelsContainerType')
@@ -128,9 +129,6 @@ class BaseDataset(ABC, TorchDataset, Generic[LabelsContainerType]):
 
 
     @abstractmethod
-    def _unify_quality_score(self, value: float) -> UnifiedQualityScore: ...
-
-    @abstractmethod
     def get_reference_image_name(self, distorted_image_name: str) -> str: ...
 
     @abstractmethod
@@ -142,6 +140,7 @@ class BaseDataset(ABC, TorchDataset, Generic[LabelsContainerType]):
     @abstractmethod
     def get_label(self, index: int) -> Label: ...
 
+
     def get_all_labels(self) -> list[Label]:
         labels: list[Label] = []
 
@@ -149,3 +148,41 @@ class BaseDataset(ABC, TorchDataset, Generic[LabelsContainerType]):
             labels.append(self.get_label(index=distorted_index))
 
         return labels
+
+
+    def _unify_quality_score(self, value: float) -> UnifiedQualityScore:
+        quality_label_type = self.config['dataset']['quality_label']['type']
+        available_quality_label_types = list(get_args(QualityScoreType))
+
+        if quality_label_type not in available_quality_label_types:
+            raise TypeError(
+                f"Error: Załadowana konfiguracja `{self.config['config_name']}` używanego datasetu `{self.config['dataset']['name']}`\n"
+                f"informuje, że etykiety posiadają nieobsługiwany typ wskaźnika jakości: `{quality_label_type}`!\n"
+                f"Aktualnie obsługiwane są tylko poniższe typy wskaźników jakości:\n"
+                f"{available_quality_label_types}"
+            )
+
+        quality_label_min = self.config['dataset']['quality_label']['min']
+        quality_label_max = self.config['dataset']['quality_label']['max']
+
+        unified_quality_score_value = 0.0
+
+        match quality_label_type:
+            case 'mos':
+                unified_quality_score_value = normalize_min_max(
+                    score_value=value,
+                    score_min=quality_label_min,
+                    score_max=quality_label_max
+                )
+
+            case 'dmos':
+                unified_quality_score_value = dmos_to_unified_quality_score(
+                    dmos_value=value,
+                    dmos_min=quality_label_min,
+                    dmos_max=quality_label_max
+                )
+
+            case 'unified_quality_score':
+                unified_quality_score_value = value
+
+        return UnifiedQualityScore(value=unified_quality_score_value)

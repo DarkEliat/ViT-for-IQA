@@ -16,7 +16,7 @@ dataset:
       path: "datasets/kadid10k/images/"
       count: 10125
   quality_label:
-    type: "dmos"
+    type: "mos"
     min: 1
     max: 5
   labels_path: "datasets/kadid10k/dmos.csv"

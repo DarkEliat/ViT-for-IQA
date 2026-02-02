@@ -4,8 +4,7 @@ import numpy as np
 from scipy.io import loadmat
 
 from src.datasets.base_dataset import BaseDataset
-from src.utils.data_types import Label, QualityScore, UnifiedQualityScore, ModelConfig
-from src.utils.quality_scores import normalize_min_max
+from src.utils.data_types import Label, QualityScore, ModelConfig
 
 
 class LiveDataset(BaseDataset[ list[dict[str, Any]] ]):
@@ -18,22 +17,6 @@ class LiveDataset(BaseDataset[ list[dict[str, Any]] ]):
     @property
     def labels_container(self) -> list[dict[str, Any]]:
         return self._labels_container
-
-
-    def _unify_quality_score(self, value: float) -> UnifiedQualityScore:
-        quality_label_type = self.config['dataset']['quality_label']['type']
-        if quality_label_type != 'mos':
-            raise TypeError(
-                'Error: Nie można konwertować wskaźnika MOS na zdefiniowane globalnie `UnifiedQualityScore`,'
-                '    ponieważ plik konfiguracyjny YAML wskazuje inny typ wskaźnika jakości niż `mos`!'
-            )
-
-        mos_min = self.config['dataset']['quality_label']['min']
-        mos_max = self.config['dataset']['quality_label']['max']
-
-        normalized_mos = normalize_min_max(score_value=value, score_min=mos_min, score_max=mos_max)
-
-        return UnifiedQualityScore(value=normalized_mos)
 
 
     def _check_label_file_keys(self, matlab_data: dict[str, np.ndarray]) -> None:

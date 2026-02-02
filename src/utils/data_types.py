@@ -12,6 +12,7 @@ TrainingConfig = dict[str, Any]
 
 SplitName = Literal['train', 'validation', 'test', 'full']
 DatasetName = Literal['kadid10k', 'tid2008', 'tid2013', 'live']
+QualityScoreType = Literal['mos', 'dmos', 'unified_quality_score']
 ConfigType = Literal['dataset', 'model', 'training']
 
 StateDict = dict[str, Tensor]

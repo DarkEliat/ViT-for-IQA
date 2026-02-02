@@ -17,7 +17,7 @@ def normalize_min_max(
     return normalized_score
 
 
-def dmos_to_quality_score(
+def dmos_to_unified_quality_score(
         dmos_value: float,
         dmos_min: float = 0.0,
         dmos_max: float = 0.0
