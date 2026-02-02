@@ -14,620 +14,342 @@ A deep learning-based image quality assessment system using Vision Transformer (
 - [Supported Datasets](#supported-datasets)
 - [Installation](#installation)
 - [Quick Start](#quick-start)
+- [CLI Reference](#cli-reference)
+  - [Download Datasets](#1-download-datasets)
+  - [Create Experiment](#2-create-experiment)
+  - [Run Training](#3-run-training)
+  - [Run Prediction & Evaluation](#4-run-evaluation)
+- [Configuration System](#configuration-system)
 - [Project Structure](#project-structure)
-- [Configuration](#configuration)
-- [Usage](#usage)
-  - [Creating Experiments](#creating-experiments)
-  - [Training](#training)
-  - [Evaluation](#evaluation)
-  - [Inference](#inference)
 - [Evaluation Metrics](#evaluation-metrics)
-- [Results](#results)
 - [Technical Details](#technical-details)
 - [Requirements](#requirements)
-- [License](#license)
 - [Author](#author)
 
 ---
 
-## 🎯 Overview
+## <a id="overview"></a>🎯 Overview
 
 Image Quality Assessment (IQA) is crucial in many computer vision applications. This project leverages the power of Vision Transformers to accurately predict perceptual quality scores for distorted images in a full-reference (FR-IQA) setting.
 
 **What is Full-Reference IQA?**
 
-- Takes both a pristine reference image and its distorted version as input
-- Predicts a quality score that correlates with human perception
-- Useful for evaluating compression algorithms, transmission systems, and image processing pipelines
+- Takes both a pristine **reference image** and its **distorted version** as input.
+- Predicts a **quality score** that correlates with human perception (MOS/DMOS).
+- Useful for evaluating compression algorithms, transmission systems, and image processing pipelines.
 
 ---
 
-## ✨ Key Features
+## <a id="key-features"></a>✨ Key Features
 
-- **🏗️ Modern Architecture**: Utilizes pretrained Vision Transformer (ViT) backbones from `timm`
-- **📊 Multiple Datasets**: Supports KADID-10k, TID2008, TID2013, and LIVE databases
-- **🔬 Rigorous Evaluation**: Implements standard IQA metrics (PLCC, SRCC, KRCC)
-- **⚙️ Flexible Configuration**: YAML-based configuration system with extensive validation
-- **💾 Experiment Management**: Organized experiment structure with automatic checkpointing
-- **🔄 Resume Training**: Intelligent checkpoint loading and training resumption
-- **📈 Logging**: TensorBoard integration for training visualization
-- **🎯 Smart Data Splitting**: Reference-based splitting to prevent data leakage
+- **🏗️ Modern Architecture**: Utilizes pretrained Vision Transformer (ViT) backbones from `timm`.
+- **🛠️ Powerful CLI**: Unified command-line interface for all tasks (training, evaluation, prediction).
+- **⚙️ Modular Configuration**: Split configuration system (`dataset`, `model`, `training`) for maximum flexibility.
+- **🔄 Cross-Dataset Evaluation**: Train on one dataset (e.g., KADID-10k) and evaluate on another (e.g., TID2013) seamlessly.
+- **📊 Robust Metrics**: Implements standard IQA metrics (PLCC, SRCC, KRCC) with **5-parameter logistic regression** for PLCC.
+- **💾 Advanced Checkpointing**: Automatic saving of best models based on SRCC improvement.
+- **📈 Logging**: Full TensorBoard integration and structured Markdown/JSON reports.
+- **📥 Auto-Download**: Utility script to automatically fetch and organize supported datasets.
 
 ---
 
-## 🏛️ Architecture
+## <a id="architecture"></a>🏛️ Architecture
 
 The model architecture consists of:
 
-1. **Backbone**: Pretrained Vision Transformer (default: `vit_base_patch16_224`)
+1.  **Backbone**: Pretrained Vision Transformer (default: `vit_base_patch16_224` from `timm`).
+    *   Processes both reference and distorted images independently (Siamese network style with shared weights).
+    *   Extracts 768-dimensional embeddings for each image.
+2.  **Regression Head**:
+    *   Concatenates embeddings: `[reference_emb, distorted_emb]` → 1536 dimensions.
+    *   Fully-connected layers: `Linear(1536→512) → ReLU → Linear(512→1)`.
+    *   Outputs a single quality score.
+3.  **Unified Quality Score**:
+    *   All internal processing uses a normalized `[0, 1]` score range (where 1.0 = best quality).
+    *   Automatically handles MOS (Mean Opinion Score) and DMOS (Differential Mean Opinion Score) conversions.
 
-   - Processes both reference and distorted images independently
-   - Extracts 768-dimensional embeddings for each image
-2. **Regression Head**:
-
-   - Concatenates embeddings: `[reference_emb, distorted_emb]` → 1536 dimensions
-   - Fully-connected layers: `Linear(1536→512) → ReLU → Linear(512→1)`
-   - Outputs a single quality score
-3. **Training**:
-
-   - Loss function: Mean Squared Error (MSE)
-   - Optimizer: Adam
-   - Configurable learning rate, batch size, and epochs
-
-```
-┌─────────────────┐     ┌─────────────────┐
-│ Reference Image │     │ Distorted Image │
-│   (224×224×3)   │     │   (224×224×3)   │
-└────────┬────────┘     └────────┬────────┘
-         │                       │
-         └───────┐       ┌───────┘
-                 ▼       ▼
-         ┌───────────────────────┐
-         │   ViT Backbone        │
-         │   (Shared Weights)    │
-         └───────┬───────────────┘
-                 │
-         [768-d] │ [768-d]
-                 │
-                 ▼
-         ┌───────────────────────┐
-         │   Concatenation       │
-         │      (1536-d)         │
-         └───────┬───────────────┘
-                 │
-                 ▼
-         ┌───────────────────────┐
-         │   Regression Head     │
-         │   FC(1536→512→1)      │
-         └───────┬───────────────┘
-                 │
-                 ▼
-         ┌───────────────────────┐
-         │  Quality Score [0,1]  │
-         └───────────────────────┘
+```mermaid
+graph TD
+    Ref[Reference Image] --> ViT_Shared[ViT Backbone\n(Shared Weights)]
+    Dist[Distorted Image] --> ViT_Shared
+    
+    ViT_Shared -->|768-d| EmbRef[Reference Embedding]
+    ViT_Shared -->|768-d| EmbDist[Distorted Embedding]
+    
+    EmbRef --> Concat[Concatenation\n(1536-d)]
+    EmbDist --> Concat
+    
+    Concat --> Head[Regression Head\nFC 1536 -> 512 -> 1]
+    Head --> Score[Quality Score\nRange 0-1]
 ```
 
 ---
 
-## 📚 Supported Datasets
+## <a id="supported-datasets"></a>📚 Supported Datasets
 
-| Dataset             | Reference Images | Distorted Images | Score Type | Range    |
-| ------------------- | ---------------- | ---------------- | ---------- | -------- |
-| **KADID-10k** | 81               | 10,125           | DMOS       | [1, 5]   |
-| **TID2008**   | 25               | 1,700            | MOS        | [0, 9]   |
-| **TID2013**   | 25               | 3,000            | MOS        | [0, 9]   |
-| **LIVE**      | 80               | 320              | MOS        | [1, 100] |
+The project supports automatic downloading and loading of the following datasets (defined in `src/datasets/dataset_map.py`):
 
-**Note**: All scores are automatically normalized to [0, 1] for training.
+| Dataset Name | Config Name | Reference Images | Distorted Images | Score Type |
+| :--- | :--- | :--- | :--- | :--- |
+| **KADID-10k** | `kadid10k` | 81 | 10,125 | DMOS |
+| **TID2013** | `tid2013` | 25 | 3,000 | MOS |
+| **TID2008** | `tid2008` | 25 | 1,700 | MOS |
+| **LIVE** | `live` | 80 | 320 | MOS |
+
+**Unified Score Logic**:
+- **MOS (e.g., TID2013)**: Normalized to `[0, 1]`.
+- **DMOS (e.g., KADID-10k)**: Inverted and normalized to `[0, 1]` so that higher is always better.
 
 ---
 
-## 🚀 Installation
+## <a id="installation"></a>🚀 Installation
 
 ### Prerequisites
 
-- Python 3.12.x
-- CUDA-capable GPU (recommended)
-- Poetry (package manager)
+- **Python 3.12+**
+- **CUDA-capable GPU** (highly recommended)
+- **Poetry** (package manager)
 
 ### Setup
 
-1. **Clone the repository**:
+1.  **Clone the repository**:
+    ```bash
+    git clone https://github.com/yourusername/ViT-for-IQA.git
+    cd ViT-for-IQA
+    ```
 
-   ```bash
-   git clone https://github.com/yourusername/ViT-for-IQA.git
-   cd ViT-for-IQA
-   ```
-2. **Install dependencies**:
+2.  **Install dependencies**:
+    ```bash
+    poetry install
+    ```
 
-   ```bash
-   poetry install
-   ```
-3. **Activate the environment**:
-
-   ```bash
-   poetry env activate
-   ```
-4. **Download datasets** (manual):
-
-   - Place datasets in the `datasets/` directory
-   - Expected structure:
-     ```
-     datasets/
-     ├── kadid10k/
-     │   ├── images/
-     │   └── dmos.csv
-     ├── tid2008/
-     │   ├── reference_images/
-     │   ├── distorted_images/
-     │   └── mos_with_names.txt
-     ├── tid2013/
-     │   ├── reference_images/
-     │   ├── distorted_images/
-     │   └── mos_with_names.txt
-     └── live/
-         ├── Images/
-         └── MOS.mat
-     ```
+3.  **Activate the environment**:
+    ```bash
+    poetry env activate
+    ```
 
 ---
 
-## ⚡ Quick Start
+## <a id="quick-start"></a>⚡ Quick Start
 
-### 1. Create an Experiment
+### <a id="1-download-datasets"></a>1. Download Datasets
 
-```bash
-python scripts/create_experiment.py
-```
-
-This will:
-
-- Prompt you to select a dataset configuration
-- Ask for an experiment name
-- Generate train/validation/test splits
-- Create experiment directory structure
-
-### 2. Train the Model
-
-Edit `scripts/run_training.py` to point to your experiment:
-
-```python
-from src.training.trainer import Trainer
-from src.utils.paths import EXPERIMENTS_LIVE_PATH
-
-trainer = Trainer(experiment_path=(EXPERIMENTS_LIVE_PATH / 'my_experiment'))
-trainer.train()
-```
-
-Run training:
+Use the included helper script to download and extract KADID-10k, TID2013, and TID2008 automatically:
 
 ```bash
-python scripts/run_training.py
+python scripts/download_datasets.py
 ```
 
-### 3. Evaluate
+### <a id="2-create-experiment"></a>2. Create an Experiment
 
-Edit `scripts/run_evaluation.py`:
-
-```python
-from src.evaluation.evaluator import Evaluator
-from src.utils.paths import EXPERIMENTS_LIVE_PATH
-
-evaluator = Evaluator(
-    experiment_path=(EXPERIMENTS_LIVE_PATH / 'my_experiment'),
-    split_name='test',
-    checkpoint_name='last.pth'
-)
-
-results = evaluator.evaluate(
-    apply_nonlinear_regression_for_plcc=True,
-    save_outputs=True
-)
-```
-
-Run evaluation:
+Create a new experiment structure based on a predefined training configuration:
 
 ```bash
-python scripts/run_evaluation.py
+python scripts/create_experiment.py \
+    --experiment-name "my_first_run" \
+    --training-config-name "training_kadid10k_vit_base_patch16_224_baseline.yaml"
+```
+
+### <a id="3-run-training"></a>3. Run Training
+
+Start the training loop:
+
+```bash
+python scripts/run_training.py \
+    --experiment-path "experiments/kadid10k/my_first_run"
+```
+
+### <a id="4-run-evaluation"></a>4. Predict & Evaluate
+
+Use prediction and evaluate the best model checkpoint on the test split:
+
+```bash
+python scripts/run_prediction.py \
+    --checkpoint-path "experiments/kadid10k/my_first_run/checkpoints/best.pth" \
+    --split-name "test"
+```
+
+```bash
+python scripts/run_evaluation.py \
+    --checkpoint-path "experiments/kadid10k/my_first_run/checkpoints/best.pth" \
+    --split-name "test"
 ```
 
 ---
 
-## 📂 Project Structure
+## <a id="cli-reference"></a>📖 CLI Reference
 
+The project functionality is exposed via scripts in the `scripts/` directory, which wrap the CLI commands defined in `src/cli/`.
+
+### Common Arguments
+- Paths are relative to the project root or `experiments/` directory where applicable.
+- Use `--help` on any script to see full options.
+
+### `create_experiment.py`
+
+Creates a new experiment workspace with configs, logs, and split indices.
+
+**Modes:**
+1.  **From Config** (New Training):
+    ```bash
+    python scripts/create_experiment.py \
+        --experiment-name "exp_name" \
+        --training-config-name "training_config.yaml"
+    ```
+2.  **From Checkpoint** (Resume/Fine-tune):
+    ```bash
+    python scripts/create_experiment.py \
+        --experiment-name "finetune_exp" \
+        --checkpoint-path "dataset/exp/checkpoints/best.pth"
+    ```
+
+### `run_training.py`
+
+Executes the training pipeline for a given experiment.
+
+```bash
+python scripts/run_training.py \
+    --experiment-path "experiments/dataset/exp_name"
 ```
+*   **Resuming**: Automatically detects existing checkpoints in the experiment folder and asks to resume.
+
+### `run_evaluation.py`
+
+Calculates performance metrics (PLCC, SRCC, KRCC, RMSE).
+
+**Modes:**
+1.  **Split Evaluation** (Evaluate on a split of the training dataset):
+    ```bash
+    python scripts/run_evaluation.py \
+        --checkpoint-path "experiments/dataset/exp/checkpoints/best.pth" \
+        --split-name "test"  # Options: train, validation, test
+    ```
+2.  **Cross-Dataset Evaluation** (Evaluate on a completely different dataset):
+    ```bash
+    python scripts/run_evaluation.py \
+        --checkpoint-path "experiments/dataset/exp/checkpoints/best.pth" \
+        --dataset-name "tid2013"
+    ```
+
+### `run_prediction.py`
+
+Runs inference and outputs raw predicted scores.
+
+```bash
+python scripts/run_prediction.py \
+    --checkpoint-path "experiments/dataset/exp/checkpoints/best.pth" \
+    --split-name "test"
+    # OR --dataset-name "tid2013"
+```
+
+---
+
+## <a id="configuration-system"></a>⚙️ Configuration System
+
+The configuration is modular, split into three YAML files found in `configs/` (source) and `experiments/.../configs/` (runtime):
+
+### 1. Dataset Config (`dataset_*.yaml`)
+Defines image paths, counts, and original score characteristics (MOS/DMOS ranges).
+*   *Example:* `configs/dataset_kadid10k.yaml`
+
+### 2. Model Config (`model_*.yaml`)
+Defines the network architecture and input requirements.
+*   *Example:* `configs/model_vit_base_patch16_224.yaml`
+*   *Key Params:* `embedding_dimension`, `input.image_size`.
+
+### 3. Training Config (`training_*.yaml`)
+Links a Model to a Dataset and defines the training hyperparameters.
+*   *Example:* `configs/training_kadid10k_vit_base_patch16_224_baseline.yaml`
+*   *Key Params:*
+    *   `dataset`: Name of the dataset to use (must match a defined dataset).
+    *   `model`: Name of the model to use.
+    *   `training.splits`: Train/Val/Test ratios (e.g., 0.6 / 0.2 / 0.2).
+    *   `training.checkpointing`: Save frequency and best-model tracking.
+
+---
+
+## <a id="project-structure"></a>📂 Project Structure
+
+```text
 ViT-for-IQA/
-├── configs/                              # Dataset configurations
-│   ├── train_kadid10k_vit_base_patch16_224_baseline.yaml
-│   ├── train_live_vit_base_patch16_224_baseline.yaml
-│   ├── train_tid2008_vit_base_patch16_224_baseline.yaml
-│   └── train_tid2013_vit_base_patch16_224_baseline.yaml
-├── datasets/                             # Dataset storage (gitignored)
-├── experiments/                          # Experiment outputs (gitignored)
+├── configs/                              # Source Global Configurations
+│   ├── dataset_*.yaml                    # Dataset definitions
+│   ├── model_*.yaml                      # Model architecture definitions
+│   └── training_*.yaml                   # Training scenarios
+├── datasets/                             # Raw Datasets (downloaded here)
+├── experiments/                          # Experiment Workspaces
 │   └── {dataset_name}/
 │       └── {experiment_name}/
-│           ├── config.yaml               # Experiment configuration
-│           ├── checkpoints/              # Model checkpoints (.pth)
-│           ├── logs/
-│           │   ├── tensorboard/          # TensorBoard logs
-│           │   └── train.log             # Training logs
-│           ├── splits/                   # Dataset split indices
-│           │   ├── train_indices.csv
-│           │   ├── validation_indices.csv
-│           │   └── test_indices.csv
-│           ├── metrics.json              # Evaluation metrics
-│           ├── metrics.csv
-│           └── summary.md                # Experiment summary
-├── scripts/                              # Executable scripts
-│   ├── create_experiment.py              # Create new experiment
-│   ├── run_training.py                   # Train model
-│   ├── run_evaluation.py                 # Evaluate model
-│   └── run_prediction.py                 # Run inference
-├── src/                                  # Source code
-│   ├── datasets/                         # Dataset loaders
-│   │   ├── base_dataset.py               # Abstract base class
-│   │   ├── factory.py                    # Dataset factory
-│   │   ├── file_map.py                   # File mapping utility
-│   │   ├── kadid_dataset.py              # KADID-10k loader
-│   │   ├── live_dataset.py               # LIVE loader
-│   │   ├── tid_dataset.py                # TID2008/TID2013 loader
-│   │   └── splits.py                     # Data splitting logic
-│   ├── evaluation/                       # Evaluation tools
-│   │   ├── correlation_metrics.py        # IQA metrics (PLCC, SRCC, KRCC)
-│   │   └── evaluator.py                  # Evaluation pipeline
-│   ├── inference/                        # Inference tools
-│   │   └── predictor.py                  # Prediction pipeline
-│   ├── models/                           # Model architectures
-│   │   └── vit_regressor.py              # ViT-based regressor
-│   ├── training/                         # Training logic
-│   │   └── trainer.py                    # Training pipeline
-│   └── utils/                            # Utilities
-│       ├── checkpoints.py                # Checkpoint management
-│       ├── configs.py                    # Configuration validation
-│       ├── data_types.py                 # Type definitions
-│       ├── image_preprocessing.py        # Image preprocessing
-│       ├── paths.py                      # Path constants
-│       └── quality_scores.py             # Score normalization
-├── pyproject.toml                        # Poetry dependencies
-├── TODO.md                               # Development roadmap
-└── README.md                             # This file
+│           ├── configs/                  # Frozen configs for this run
+│           ├── checkpoints/              # Saved models (.pth)
+│           ├── logs/                     # TensorBoard & Text logs
+│           ├── splits/                   # Deterministic split indices (.csv)
+│           └── metrics.md                # Evaluation report
+├── scripts/                              # CLI Entrypoints
+├── src/                                  # Source Code
+│   ├── cli/                              # CLI Implementation & Validators
+│   ├── configs/                          # Config Loading & Logic
+│   ├── datasets/                         # Data Loading & Splitting
+│   ├── evaluation/                       # Metrics (PLCC, SRCC, KRCC)
+│   ├── experiments/                      # Experiment Management
+│   ├── inference/                        # Prediction Logic
+│   ├── models/                           # ViT Implementation
+│   ├── training/                         # Trainer Loop
+│   └── utils/                            # Helpers
+└── pyproject.toml                        # Dependencies
 ```
 
 ---
 
-## ⚙️ Configuration
+## <a id="evaluation-metrics"></a>📊 Evaluation Metrics
 
-Configuration files are in YAML format and define all experiment parameters.
+The system computes correlation metrics between the **Ground Truth** (subjective human scores) and **Predicted Scores**:
 
-### Key Configuration Sections
+1.  **PLCC (Pearson Linear Correlation Coefficient)**:
+    *   Measures linear correlation.
+    *   Computed **after** fitting a 5-parameter logistic function (Sheikh et al.) to the predictions to account for nonlinearity.
+2.  **SRCC (Spearman Rank Correlation Coefficient)**:
+    *   Measures monotonic relationship (rank order).
+    *   Primary metric used for monitoring "best" checkpoints.
+3.  **KRCC (Kendall Rank Correlation Coefficient)**:
+    *   Another rank-based correlation metric.
 
-```yaml
-config_name: "live_vit_base_patch16_224_baseline"
-
-app:
-  version: "0.1.0"
-
-dataset:
-  name: "live"                            # Dataset identifier
-  representative_name: "LIVE Wild Compressed Picture Quality Database"
-  images:
-    reference:
-      path: "datasets/live/Images/"
-      count: 80
-    distorted:
-      path: "datasets/live/Images/"
-      count: 320
-  quality_label:
-    type: "mos"                           # "mos" or "dmos"
-    min: 1
-    max: 100
-  labels_path: "datasets/live/MOS.mat"
-
-model:
-  name: "vit_base_patch16_224"            # Model from timm
-  input:
-    image_size:
-      width: 224
-      height: 224
-    keep_original_aspect_ratio: true
-  embedding_dimension: 768
-  output:
-    type: "normalized_mos"                # Output normalization
-    min: 0
-    max: 1
-
-training:
-  splits:
-    train: 0.6
-    validation: 0.2
-    test: 0.2
-    random_seed: 42
-  batch_size: 8
-  num_of_epochs: 5
-  learning_rate: 0.0001
-  device: "cuda"
-  num_of_workers: 4
-  early_stopping:
-    enabled: false
-    max_epochs_without_improvement: 5
-    min_improvement_delta: 0.001
-
-checkpointing:
-  enabled: true
-  save_every_n_epochs: 1
-  save_last_epoch: true
-  save_best_epoch: true
-
-logging:
-  tensorboard: true
-```
-
-### Configuration Validation
-
-The system performs extensive validation:
-
-- ✅ File and directory existence checks
-- ✅ Value range validation
-- ✅ Cross-section consistency (e.g., MOS → normalized_mos)
-- ✅ Type checking for all parameters
+**Results Output**:
+Results are saved to `experiments/.../metrics.md` (Markdown report), `.json` (Machine readable), and `.csv` (Data analysis).
 
 ---
 
-## 📖 Usage
-
-### Creating Experiments
-
-The experiment creation script provides an interactive interface:
-
-```bash
-python scripts/create_experiment.py
-```
-
-**Options**:
-
-1. Create from scratch using a global config file
-2. Create from existing checkpoint (for fine-tuning)
-
-**What it does**:
-
-- Generates reference-based train/val/test splits
-- Creates directory structure
-- Copies configuration
-- Initializes checkpoint (if specified)
-
-### Training
-
-The `Trainer` class handles the complete training pipeline:
-
-```python
-from pathlib import Path
-from src.training.trainer import Trainer
-
-# Initialize trainer
-trainer = Trainer(experiment_path=Path("experiments/live/my_experiment"))
-
-# Start/resume training
-trainer.train()
-```
-
-**Features**:
-
-- Automatic checkpoint resumption
-- TensorBoard logging
-- Validation after each epoch
-- Configurable checkpoint saving
-
-**Training outputs**:
-
-- `checkpoints/last.pth` - Latest checkpoint
-- `checkpoints/epoch_N.pth` - Periodic checkpoints
-- `checkpoints/best.pth` - Best performing checkpoint
-- `logs/tensorboard/` - TensorBoard logs
-
-### Evaluation
-
-The `Evaluator` class computes IQA metrics:
-
-```python
-from src.evaluation.evaluator import Evaluator
-
-evaluator = Evaluator(
-    experiment_path=Path("experiments/live/my_experiment"),
-    split_name='test',                    # 'train', 'validation', or 'test'
-    checkpoint_name='last.pth'
-)
-
-results = evaluator.evaluate(
-    apply_nonlinear_regression_for_plcc=True,  # Fit 5-parameter logistic
-    save_outputs=True                          # Save metrics to files
-)
-
-print(f"PLCC: {results.plcc:.4f}")
-print(f"SRCC: {results.srcc:.4f}")
-print(f"KRCC: {results.krcc:.4f}")
-```
-
-### Inference
-
-The `Predictor` class enables predictions on custom data:
-
-```python
-from src.inference.predictor import Predictor
-
-predictor = Predictor(
-    experiment_path=Path("experiments/live/my_experiment"),
-    checkpoint_name='last.pth'
-)
-
-# Predict on training dataset
-predictions = predictor.predict_on_training_dataset()
-
-# Predict with custom DataLoader
-from torch.utils.data import DataLoader
-custom_loader = DataLoader(...)
-predictions = predictor.predict(data_loader=custom_loader)
-```
-
----
-
-## 📊 Evaluation Metrics
-
-### Correlation Metrics
-
-1. **PLCC (Pearson Linear Correlation Coefficient)**
-
-   - Measures linear correlation with human perception
-   - Optional 5-parameter logistic regression fitting
-   - Range: [-1, 1], higher is better
-2. **SRCC (Spearman Rank Correlation Coefficient)**
-
-   - Measures monotonic relationship
-   - More robust to outliers than PLCC
-   - Range: [-1, 1], higher is better
-3. **KRCC (Kendall Rank Correlation Coefficient)**
-
-   - Alternative rank-based correlation
-   - Measures ordinal association
-   - Range: [-1, 1], higher is better
-
-### Error Metrics
-
-- **MSE**: Mean Squared Error
-- **RMSE**: Root Mean Squared Error
-- **MAE**: Mean Absolute Error
-
-### Nonlinear Regression
-
-For PLCC calculation, the system can apply a 5-parameter logistic function:
-
-```
-f(x) = β₂ + (β₁ - β₂) / (1 + exp(-(x - β₃) / |β₄|)) + β₅·x
-```
-
-This accounts for nonlinear mapping between predicted scores and subjective ratings.
-
----
-
-## 🏆 Results
-
-Results will vary based on:
-
-- Dataset used
-- Number of training epochs
-- Model architecture
-- Hyperparameters
-
-Example results structure (after evaluation):
-
-```markdown
-# Experiment summary
-
-## Identification:
-- Dataset: `live`
-- Config: `live_vit_base_patch16_224_baseline`
-- Split: `test`
-- Checkpoint: `last.pth`
-- Device: `cuda`
-- Number of samples: 64
-
-## Correlation metrics:
-- PLCC: `0.9234`
-- SRCC: `0.9156`
-- KRCC: `0.7891`
-
-## Error metrics:
-- MSE: 0.0234
-- RMSE: 0.1530
-- MAE: 0.1123
-```
-
----
-
-## 🔧 Technical Details
+## <a id="technical-details"></a>🔧 Technical Details
 
 ### Data Splitting Strategy
+To prevent **Data Leakage**, splitting is performed by **Reference Image**:
+1.  All reference images are shuffled deterministically (seed-based).
+2.  References are assigned to Train, Validation, or Test sets.
+3.  All distorted versions of a specific reference image are forced into the same set as their reference.
+4.  This ensures the model never sees a distortion of a "Test" reference image during training.
 
-To prevent data leakage, the system splits data **by reference images**:
-
-1. Shuffle reference images deterministically (using random seed)
-2. Split references into train/val/test
-3. Assign all distortions of each reference to the same split
-
-This ensures that distortions of the same reference never appear in different splits.
-
-### Image Preprocessing
-
-1. **Resize**: Images resized to 224×224
-2. **Aspect Ratio**: Option to preserve aspect ratio (with padding)
-3. **Normalization**: ToTensor() converts to [0, 1] range
-4. **Padding**: Black padding (0, 0, 0) for aspect ratio preservation
-
-### Quality Score Normalization
-
-- **MOS → Unified**: `(value - min) / (max - min)`
-- **DMOS → Unified**: `1 - ((value - min) / (max - min))`
-- All unified scores in [0, 1] where 1 = best quality
-
-### Checkpoint Structure
-
-Checkpoints contain:
-
-```python
-{
-    'epoch': int,
-    'model_state_dict': OrderedDict,
-    'optimizer_state_dict': OrderedDict,
-    'train_loss': float,
-    'validation_loss': float
-}
-```
+### Checkpointing
+Saved `.pth` files are pickle objects (`CheckpointPickle`) containing:
+- `model_state_dict`: Weights.
+- `optimizer_state_dict`: Optimizer state.
+- `config`: Complete training configuration used.
+- `best_epoch`: Statistics of the best epoch so far.
+- `last_epoch`: Statistics of the current epoch.
 
 ---
 
-## 📦 Requirements
+## <a id="requirements"></a>📦 Requirements
 
-### Core Dependencies
+*   **torch**, **torchvision**, **timm** (Deep Learning)
+*   **numpy**, **pandas**, **scipy** (Data & Metrics)
+*   **Pillow**, **opencv-python** (Image Processing)
+*   **pyyaml** (Configuration)
+*   **tensorboard** (Logging)
 
-- **torch** - Deep learning framework
-- **torchvision** - Computer vision utilities
-- **timm** - Pretrained vision models
-- **numpy** - Numerical computing
-- **pandas** - Data manipulation
-- **scipy** - Scientific computing (for metrics)
-- **Pillow** - Image processing
-- **scikit-image** - Image processing
-- **opencv-python** - Computer vision
-- **scikit-learn** - Machine learning metrics
-- **einops** - Tensor operations
-- **safetensors** - Safe tensor serialization
-- **pyyaml** - Configuration parsing
-
-### Development Dependencies
-
-- **matplotlib** - Plotting
-- **tqdm** - Progress bars
-- **tensorboard** - Visualization
-
-### System Requirements
-
-- **Python**: 3.12.x
-- **GPU**: CUDA-capable (recommended)
-- **RAM**: 16GB+ recommended
-- **Storage**: Depends on datasets (KADID-10k ~10GB, others smaller)
+See `pyproject.toml` for exact version constraints.
 
 ---
 
-## 🗺️ Roadmap
+## <a id="author"></a>✍️ Author
 
-### Upcoming Features
-
-- [ ] Automatic dataset downloading
-- [ ] Enhanced checkpoint management
-- [ ] Early stopping implementation
-- [ ] Extended logging to `train.log`
-- [ ] Experiment consistency verification module
-- [ ] Support for no-reference IQA
-- [ ] Additional backbone architectures
-- [ ] Hyperparameter optimization tools
-
----
+**Jan Kostka (aka DarkEliat)**
