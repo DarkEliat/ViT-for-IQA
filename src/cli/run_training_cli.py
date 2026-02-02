@@ -6,6 +6,7 @@ from src.cli.base_cli_command import BaseCliCommand
 from src.cli.arguments import add_experiment_path_arg
 from src.cli.validators import validate_experiment_path_arg
 from src.training.trainer import Trainer
+from src.utils.paths import EXPERIMENTS_PATH
 
 
 @dataclass(frozen=True)
@@ -29,7 +30,10 @@ class TrainingCliCommand(BaseCliCommand[TrainingCliArgs]):
 
 
     def validate_and_normalize_args(self, parsed_namespace: argparse.Namespace) -> TrainingCliArgs:
-        experiment_path = validate_experiment_path_arg(experiment_path=parsed_namespace.experiment_path)
+        experiment_path = EXPERIMENTS_PATH / parsed_namespace.experiment_path
+
+        validate_experiment_path_arg(experiment_path=experiment_path)
+
         return TrainingCliArgs(experiment_path=experiment_path)
 
 

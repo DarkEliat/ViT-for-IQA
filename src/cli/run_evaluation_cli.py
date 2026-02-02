@@ -4,23 +4,28 @@ from pathlib import Path
 
 from src.cli.base_cli_command import BaseCliCommand
 from src.cli.arguments import (
-    add_checkpoint_name_arg,
-    add_experiment_path_arg,
-    add_split_name_arg,
+    add_checkpoint_path_arg,
+    add_dataset_name_arg,
+    add_split_name_arg
 )
 from src.cli.validators import (
-    validate_experiment_path_arg,
-    validate_split_name_arg,
+    validate_checkpoint_path_arg,
+    validate_dataset_name_arg,
+    validate_split_name_arg
 )
+from src.configs.loader import load_config
+from src.datasets.dataset_map import DATASET_NAME_TO_CONFIG_PATH_MAP
+from src.datasets.factory import build_data_loader
 from src.evaluation.evaluator import Evaluator
-from src.utils.data_types import SplitName
+from src.utils.data_types import SplitName, DatasetName
+from src.utils.paths import EXPERIMENTS_PATH
 
 
 @dataclass(frozen=True)
 class EvaluationCliArgs:
-    experiment_path: Path
-    checkpoint_name: str
-    split_name: SplitName
+    checkpoint_path: Path
+    dataset_name: DatasetName | None
+    split_name: SplitName | None
 
 
 class EvaluationCliCommand(BaseCliCommand[EvaluationCliArgs]):
@@ -31,34 +36,94 @@ class EvaluationCliCommand(BaseCliCommand[EvaluationCliArgs]):
 
     @property
     def command_description(self) -> str:
-        return "Uruchamia ewaluację dla wskazanej checkpointu (.pth) i splitu wewnątrz ścieżki eksperymentu."
+        return "Uruchamia ewaluację dla wskazanego checkpointu (.pth)."
 
 
     def add_args(self, parser: argparse.ArgumentParser) -> None:
-        add_experiment_path_arg(parser=parser, required=True)
-        add_split_name_arg(parser=parser, required=True)
-        add_checkpoint_name_arg(parser=parser, required=True)
+        add_checkpoint_path_arg(parser=parser, required=True)
+        add_dataset_name_arg(parser=parser, required=False)
+        add_split_name_arg(parser=parser, required=False)
 
 
     def validate_and_normalize_args(self, parsed_namespace: argparse.Namespace) -> EvaluationCliArgs:
-        experiment_path = validate_experiment_path_arg(experiment_path=parsed_namespace.experiment_path)
+        checkpoint_path = EXPERIMENTS_PATH / parsed_namespace.checkpoint_path
+        dataset_name = parsed_namespace.dataset_name
         split_name = parsed_namespace.split_name
-        checkpoint_name = parsed_namespace.checkpoint_name
 
-        validate_split_name_arg(experiment_path=experiment_path, split_name=split_name)
+        validate_checkpoint_path_arg(checkpoint_path=checkpoint_path)
+        if dataset_name is not None:
+            validate_dataset_name_arg(dataset_name=dataset_name)
+        if split_name is not None:
+            validate_split_name_arg(split_name=split_name)
+
+        is_full_training_dataset_mode = dataset_name is not None
+        is_split_cross_dataset_mode = split_name is not None
+
+        proper_use_message = '''
+                Użyj:\n
+                    --checkpoint-path <dataset_name>/<experiment_name>/checkpoints/<file.pth>\n
+                        oraz\n
+                    --dataset-name <dataset_name>\n
+                albo:\n
+                    --checkpoint-path <dataset_name>/<experiment_name>/checkpoints/<file.pth>\n
+                        oraz\n
+                    --split-name <split_name>
+                '''
+
+        if is_full_training_dataset_mode and is_split_cross_dataset_mode:
+            raise ValueError(
+                f"Error: Nieprawidłowa kombinacja argumentów!\n"
+                f"{proper_use_message}"
+            )
+
+        if not is_full_training_dataset_mode and not is_split_cross_dataset_mode:
+            raise ValueError(
+                f"Error: Brakujące wymagane argumenty!\n"
+                f"{proper_use_message}"
+            )
 
         return EvaluationCliArgs(
-            experiment_path=experiment_path,
-            checkpoint_name=checkpoint_name,
+            checkpoint_path=checkpoint_path,
+            dataset_name=dataset_name,
             split_name=split_name
         )
 
 
     def run_command(self, normalized_args: EvaluationCliArgs) -> None:
-        evaluator = Evaluator(
-            experiment_path=normalized_args.experiment_path,
-            checkpoint_name=normalized_args.checkpoint_name,
-            split_name=normalized_args.split_name
-        )
+        checkpoint_path = normalized_args.checkpoint_path
+        dataset_name = normalized_args.dataset_name
+        split_name: SplitName | None = normalized_args.split_name
 
-        evaluator.evaluate(save_outputs=False)
+        evaluator = Evaluator(checkpoint_path=checkpoint_path)
+
+        if split_name is not None:
+            experiment_path = checkpoint_path.parent.parent
+            data_loader = build_data_loader(
+                dataset_config=evaluator.checkpoint_dataset_config,
+                model_config=evaluator.checkpoint_model_config,
+                training_config=evaluator.checkpoint_training_config,
+                split_name=split_name,
+                experiment_path=experiment_path
+            )
+        else:
+            split_name: SplitName = 'full'
+
+            dataset_config_path = DATASET_NAME_TO_CONFIG_PATH_MAP[dataset_name]
+            dataset_config = load_config(
+                config_path=dataset_config_path,
+                config_type='dataset',
+                check_consistency=True
+            )
+
+            data_loader = build_data_loader(
+                dataset_config=dataset_config,
+                model_config=evaluator.checkpoint_model_config,
+                training_config=evaluator.checkpoint_training_config,
+                split_name=split_name,
+                experiment_path=None
+            )
+
+        evaluator.evaluate(
+            data_loader=data_loader,
+            split_name=split_name
+        )

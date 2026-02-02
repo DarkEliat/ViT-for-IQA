@@ -8,44 +8,54 @@ from src.datasets.kadid_dataset import Kadid10kDataset
 from src.datasets.live_dataset import LiveDataset
 from src.datasets.splits import load_split_indices
 from src.datasets.tid_dataset import Tid2008Dataset, Tid2013Dataset
-from src.utils.data_types import Config, SplitName
+from src.utils.data_types import SplitName, DatasetConfig, ModelConfig, TrainingConfig
 
 
-def build_dataset(config: Config) -> TorchDataset | BaseDataset:
-    match config['dataset']['name']:
+def build_dataset(
+        dataset_config: DatasetConfig,
+        model_config: ModelConfig
+) -> TorchDataset | BaseDataset:
+    match dataset_config['dataset']['name']:
         case 'kadid10k':
-            return Kadid10kDataset(config=config)
+            return Kadid10kDataset(dataset_config=dataset_config, model_config=model_config)
         case 'tid2008':
-            return Tid2008Dataset(config=config)
+            return Tid2008Dataset(dataset_config=dataset_config, model_config=model_config)
         case 'tid2013':
-            return Tid2013Dataset(config=config)
+            return Tid2013Dataset(dataset_config=dataset_config, model_config=model_config)
         case 'live':
-            return LiveDataset(config=config)
+            return LiveDataset(dataset_config=dataset_config, model_config=model_config)
         case _:
-            raise ValueError(f"Error: Niewspierany typ bazy danych: `{config['dataset']['name']}`!")
+            raise ValueError(f"Error: Niewspierany typ bazy danych: `{dataset_config['dataset']['name']}`!")
 
 
 def build_full_data_loader(
-        config: Config,
+        dataset_config: DatasetConfig,
+        model_config: ModelConfig,
+        training_config: TrainingConfig,
         shuffle: bool = False
 ) -> DataLoader:
-    print(f"\nŁadowanie całego datasetu `{config['dataset']['name']}`...\n"
+    print(f"\nŁadowanie całego datasetu `{dataset_config['dataset']['name']}`...\n"
           f"    To może potrwać nawet do kilku minut...")
 
-    dataset: TorchDataset = build_dataset(config=config)
+    dataset: TorchDataset = build_dataset(
+        dataset_config=dataset_config,
+        model_config=model_config
+    )
 
     data_loader = DataLoader(
         dataset,
-        batch_size=config['training']['batch_size'],
+        batch_size=training_config['training']['batch_size'],
         shuffle=shuffle,
-        num_workers=config['training']['num_of_workers']
+        num_workers=training_config['training']['num_of_workers']
     )
 
     return data_loader
 
 
 def build_split_data_loader(
-        config: Config,
+        dataset_config: DatasetConfig,
+        model_config: ModelConfig,
+        training_config: TrainingConfig,
         split_name: SplitName,
         experiment_path: Path,
         shuffle: bool = False
@@ -81,27 +91,31 @@ def build_split_data_loader(
     )
 
     # Budowanie pełnego datasetu, a następnie ograniczenie go do `Subset`.
-    dataset: TorchDataset = build_dataset(config=config)
+    dataset: TorchDataset = build_dataset(
+        dataset_config=dataset_config,
+        model_config=model_config
+    )
     subset_dataset: Subset = Subset(dataset, split_indices)
 
     data_loader = DataLoader(
         subset_dataset,
-        batch_size=config['training']['batch_size'],
+        batch_size=training_config['training']['batch_size'],
         shuffle=shuffle,
-        num_workers=config['training']['num_of_workers']
+        num_workers=training_config['training']['num_of_workers']
     )
 
     return data_loader
 
 
 def build_data_loader(
-        config: Config,
+        dataset_config: DatasetConfig,
+        model_config: ModelConfig,
+        training_config: TrainingConfig,
         split_name: SplitName,
-        experiment_path: Path,
+        experiment_path: Path | None,
         shuffle: bool = False
 ) -> DataLoader:
     available_split_names = list(get_args(SplitName))
-
     if split_name not in available_split_names:
         raise ValueError(
             f"Error: Split o nazwie `{split_name}` nie jest dostępny!\n"
@@ -109,14 +123,21 @@ def build_data_loader(
             f"{available_split_names}"
         )
 
+    if split_name != 'full' and experiment_path is None:
+        raise ValueError(f"Error: Przekazano nazwę splitu bez ścieżki do eksperymentu, z którego można odczytać indeksy obrazów (*_indices.csv)!")
+
     if split_name == 'full':
         return build_full_data_loader(
-            config=config,
+            dataset_config=dataset_config,
+            model_config=model_config,
+            training_config=training_config,
             shuffle=shuffle
         )
     else:
         return build_split_data_loader(
-            config=config,
+            dataset_config=dataset_config,
+            model_config=model_config,
+            training_config=training_config,
             split_name=split_name,
             experiment_path=experiment_path,
             shuffle=shuffle

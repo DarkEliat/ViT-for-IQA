@@ -8,7 +8,7 @@ from torch.utils.data import Dataset as TorchDataset
 from torchvision import transforms
 
 from src.datasets.file_map import FileMap
-from src.utils.data_types import Label, Config, UnifiedQualityScore
+from src.utils.data_types import Label, UnifiedQualityScore, DatasetConfig, ModelConfig
 from src.utils.image_preprocessing import resize
 from src.utils.paths import PROJECT_ROOT_PATH
 
@@ -16,26 +16,26 @@ from src.utils.paths import PROJECT_ROOT_PATH
 LabelsContainerType = TypeVar('LabelsContainerType')
 
 class BaseDataset(ABC, TorchDataset, Generic[LabelsContainerType]):
-    def __init__(self, config):
-        self._config = config
+    def __init__(self, dataset_config: DatasetConfig, model_config: ModelConfig):
+        self._config = dataset_config
 
-        self._labels_path = PROJECT_ROOT_PATH / config['dataset']['labels_path']
+        self._labels_path = PROJECT_ROOT_PATH / dataset_config['dataset']['labels_path']
 
-        self._reference_images_path = Path(config['dataset']['images']['reference']['path'])
-        self._distorted_images_path = Path(config['dataset']['images']['distorted']['path'])
+        self._reference_images_path = Path(dataset_config['dataset']['images']['reference']['path'])
+        self._distorted_images_path = Path(dataset_config['dataset']['images']['distorted']['path'])
 
         self._reference_image_map = FileMap(files_directory_path=self.reference_images_path)
         self._distorted_image_map = FileMap(files_directory_path=self.distorted_images_path)
 
-        self._reference_image_count = config['dataset']['images']['reference']['count']
-        self._distorted_image_count = config['dataset']['images']['distorted']['count']
+        self._reference_image_count = dataset_config['dataset']['images']['reference']['count']
+        self._distorted_image_count = dataset_config['dataset']['images']['distorted']['count']
 
         self._target_image_size = (
-            config['model']['input']['image_size']['width'],
-            config['model']['input']['image_size']['height'],
+            model_config['model']['input']['image_size']['width'],
+            model_config['model']['input']['image_size']['height'],
         )
 
-        self._keep_original_aspect_ratio = config['model']['input']['keep_original_aspect_ratio']
+        self._keep_original_aspect_ratio = model_config['model']['input']['keep_original_aspect_ratio']
 
         self._transform = transforms.Compose([
             transforms.ToTensor()
@@ -87,7 +87,7 @@ class BaseDataset(ABC, TorchDataset, Generic[LabelsContainerType]):
         return self._labels_path
 
     @property
-    def config(self) -> Config:
+    def config(self) -> DatasetConfig:
         return self._config
 
     @property

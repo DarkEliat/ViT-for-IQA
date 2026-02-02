@@ -1,0 +1,22 @@
+config_name: "dataset_tid2013"
+
+app_version: "0.1.1"
+
+dataset:
+  representative_name: "TID2013"
+  name: "tid2013"
+  original_image_size:
+    width: 512
+    height: 384
+  images:
+    reference:
+      path: "datasets/tid2013/reference_images/"
+      count: 25
+    distorted:
+      path: "datasets/tid2013/distorted_images/"
+      count: 3000
+  quality_label:
+    type: "mos"
+    min: 0
+    max: 9
+  labels_path: "datasets/tid2013/mos_with_names.txt"

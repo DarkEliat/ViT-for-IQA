@@ -4,25 +4,27 @@ from pathlib import Path
 
 import numpy as np
 import torch
+from torch.utils.data import DataLoader
 
 from src.evaluation.correlation_metrics import CorrelationMetrics, compute_correlations
 from src.inference.predictor import Predictor
 from src.utils.data_types import SplitName, EvaluationResults, LossMetrics
-from src.datasets.factory import build_data_loader
 
 
 class Evaluator:
     def __init__(
             self,
-            experiment_path: Path,
-            checkpoint_name: str = 'last.pth',
-            split_name: SplitName = 'test',
+            checkpoint_path: Path,
             batch_size_override: int | None = None,
             num_of_workers_override: int | None = None
     ) -> None:
+        print(f"\n[Evaluator] Rozpoczęto ładowanie checkpointu...")
+
+        experiment_path = checkpoint_path.parent.parent
+        checkpoint_name = checkpoint_path.name
+
         self.experiment_path = experiment_path
         self.checkpoint_name = checkpoint_name
-        self.split_name: SplitName = split_name
 
         self.checkpoint_path = experiment_path / 'checkpoints/'
         self.splits_path = experiment_path / 'splits/'
@@ -32,57 +34,55 @@ class Evaluator:
         self.summary_md_path = experiment_path / 'summary.md'
 
         self.predictor = Predictor(
-            experiment_path=experiment_path,
-            checkpoint_name=checkpoint_name,
+            checkpoint_path=checkpoint_path,
             batch_size_override=batch_size_override,
             num_of_workers_override=num_of_workers_override
         )
 
-        self.config = self.predictor.config
+        self.checkpoint_dataset_config = self.predictor.checkpoint_dataset_config
+        self.checkpoint_model_config = self.predictor.checkpoint_model_config
+        self.checkpoint_training_config = self.predictor.checkpoint_training_config
 
-        self.config_name = self.config['config_name']
-        self.dataset_name = self.config['dataset']['name']
-        self.device = self.config['training']['device']
+        self.checkpoint_training_config_name = self.checkpoint_training_config['config_name']
+        self.checkpoint_dataset_name = self.checkpoint_dataset_config['dataset']['name']
+        self.device = self.checkpoint_training_config['training']['device']
 
         self.batch_size: int = (
             batch_size_override
             if isinstance(batch_size_override, int)
-            else self.config['training']['batch_size']
+            else self.checkpoint_training_config['training']['batch_size']
         )
 
         self.num_of_workers: int = (
             num_of_workers_override
             if isinstance(num_of_workers_override, int)
-            else self.config['training']['num_of_workers']
+            else self.checkpoint_training_config['training']['num_of_workers']
         )
 
         print(
-            "\n[Evaluator] Rozpoczęto ładowanie eksperymentu:\n"
+            "\n[Evaluator] Załadowano checkpoint:\n"
             f"    Ścieżka eksperymentu: {self.experiment_path}\n"
-            f"    Nazwa checkpoint: `{self.checkpoint_name}`\n"
-            f"    Nazwa datasetu: `{self.dataset_name}`\n"
-            f"    Nazwa splitu: `{self.split_name}`\n"
-            f"    Nazwa configu: `{self.config_name}`\n"
-            f"    Batch size: {self.batch_size}\n"
-            f"    Device: `{self.device}`\n"
-            f"    Number of workers: {self.num_of_workers}"
+            f"    Nazwa checkpointu, który zostanie poddany ewaluacji: `{self.checkpoint_name}`\n"
+            f"    Dane o dokonanym treningu wskazanego checkpointu:\n"
+            f"        Nazwa datasetu treningowego: `{self.checkpoint_dataset_name}`\n"
+            f"        Nazwa configu treningowego: `{self.checkpoint_training_config_name}`\n"
+            f"        Batch size: {self.batch_size}\n"
+            f"        Device: `{self.device}`\n"
+            f"        Number of workers: {self.num_of_workers}"
         )
-
-        self.data_loader = build_data_loader(
-            config=self.config,
-            split_name=split_name,
-            experiment_path=experiment_path
-        )
-
-        print('\n[Evaluator] Załadowano eksperyment!')
 
 
     @torch.no_grad()
-    def evaluate(self, save_outputs: bool):
+    def evaluate(
+            self,
+            data_loader: DataLoader,
+            split_name: SplitName,
+            save_outputs: bool = False
+    ):
         print('\n[Evaluator] Rozpoczęto ewaluację...')
 
         ground_truth_scores, predicted_scores = self.predictor.predict_with_ground_truth(
-            data_loader=self.data_loader,
+            data_loader=data_loader,
         )
 
         # Metryki korelacyjne IQA
@@ -117,10 +117,10 @@ class Evaluator:
                 mae=mae_value
             ),
             num_of_samples=len(ground_truth_scores),
-            split_name=self.split_name,
+            split_name=split_name,
             checkpoint_name=self.checkpoint_name,
-            config_name=self.config_name,
-            dataset_name=self.dataset_name,
+            training_config_name=self.checkpoint_training_config_name,
+            dataset_name=self.checkpoint_dataset_name,
             device=self.device
         )
 
@@ -185,7 +185,7 @@ class Evaluator:
             "",
             "## Identification:",
             f"- Dataset: `{results.dataset_name}`",
-            f"- Config: `{results.config_name}`",
+            f"- Config: `{results.training_config_name}`",
             f"- Split: `{results.split_name}`",
             f"- Checkpoint: `{results.checkpoint_name}`",
             f"- Device: `{results.device}`",

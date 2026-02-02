@@ -3,8 +3,18 @@ from dataclasses import dataclass, field
 
 from torch import Tensor
 
+from src.datasets.dataset_map import DATASET_LIST
 
-Config = dict[str, Any]
+
+DatasetConfig = dict[str, Any]
+ModelConfig = dict[str, Any]
+TrainingConfig = dict[str, Any]
+
+SplitName = Literal['train', 'validation', 'test', 'full']
+DatasetName = Literal['kadid10k', 'tid2008', 'tid2013', 'live']
+ConfigType = Literal['dataset', 'model', 'training']
+
+StateDict = dict[str, Tensor]
 
 
 class QualityScore(TypedDict):
@@ -30,7 +40,6 @@ class UnifiedQualityScore:
             raise ValueError('Error: Ustawiona wartość zunifikowanego wskaźnika jakości `UnifiedQualityScore` wykracza poza zakres <0.0, 1.0>!')
 
 
-
 class Label(TypedDict):
     reference_image_name: str
     distorted_image_name: str
@@ -51,8 +60,6 @@ class LossMetrics:
     mae: float = float('inf')
 
 
-SplitName = Literal['train', 'validation', 'test', 'full']
-
 @dataclass(frozen=True)
 class EvaluationResults:
     correlation: CorrelationMetrics
@@ -60,7 +67,7 @@ class EvaluationResults:
     num_of_samples: int
     split_name: SplitName
     checkpoint_name: str
-    config_name: str
+    training_config_name: str
     dataset_name: str
     device: str
 
@@ -73,12 +80,10 @@ class CheckpointInfo:
     validation_correlation: CorrelationMetrics = field(default_factory=CorrelationMetrics)
 
 
-StateDict = dict[str, Tensor]
-
 @dataclass(frozen=True)
 class CheckpointPickle:
     model_state_dict: StateDict
     optimizer_state_dict: StateDict
     last_epoch: CheckpointInfo
     best_epoch: CheckpointInfo
-    config: Config
+    config: TrainingConfig

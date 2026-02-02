@@ -2,32 +2,34 @@ from pathlib import Path
 import shutil
 
 from src.datasets.base_dataset import BaseDataset
-from src.utils.configs import load_config
+from src.configs.loader import load_config
+from src.datasets.dataset_map import DATASET_NAME_TO_CONFIG_PATH_MAP
 from src.datasets.factory import build_dataset
 from src.datasets.splits import generate_split
+from src.models.model_map import MODEL_NAME_TO_CONFIG_PATH_MAP
 from src.utils.paths import EXPERIMENTS_PATH
 
 
 def _validate_experiment_creation_args(
-        config_path: Path | None = None,
+        training_config_path: Path | None = None,
         checkpoint_path: Path | None = None
 ):
     if not EXPERIMENTS_PATH.parent.exists():
         raise FileNotFoundError('Error: Nie istnieje folder nadrzędny folderu `experiments`!')
 
-    if config_path is None and checkpoint_path is None:
+    if training_config_path is None and checkpoint_path is None:
         raise ValueError('Error: Nie przekazano pliku konfiguracyjnego YAML ani pliku checkpointu z innego eksperymentu!')
 
-    if config_path is not None and checkpoint_path is not None:
+    if training_config_path is not None and checkpoint_path is not None:
         raise ValueError(
             'Error: Przekazano jednocześnie plik konfiguracyjny YAML oraz plik checkpointu!\n'
             'Można jednocześnie przekazać tylko jeden z argumentów!'
         )
 
-    if config_path is not None and not config_path.exists():
+    if training_config_path is not None and not training_config_path.exists():
         raise FileNotFoundError(
             f"Error: Przekazany plik konfiguracyjny YAML nie istnieje!\n"
-            f"Ścieżka: {config_path}"
+            f"Ścieżka: {training_config_path}"
         )
 
     if checkpoint_path is not None and not checkpoint_path.exists():
@@ -39,6 +41,7 @@ def _validate_experiment_creation_args(
 
 def _create_directories(experiment_path: Path) -> None:
     directories = [
+        experiment_path / 'configs/',
         experiment_path / 'checkpoints/',
         experiment_path / 'logs/',
         experiment_path / 'logs' / 'tensorboard/',
@@ -64,11 +67,11 @@ def _create_empty_files(experiment_path: Path) -> None:
 
 def create_experiment(
         experiment_name: str,
-        config_path: Path | None = None,
+        training_config_path: Path | None = None,
         checkpoint_path: Path | None = None
 ) -> Path:
     _validate_experiment_creation_args(
-        config_path=config_path,
+        training_config_path=training_config_path,
         checkpoint_path=checkpoint_path
     )
 
@@ -77,24 +80,54 @@ def create_experiment(
     EXPERIMENTS_PATH.mkdir(exist_ok=True)
 
     if creating_from_checkpoint:
-        config_path = checkpoint_path.parent.parent / 'config.yaml'
-
         print(
             f"Tworzenie eksperymentu na podstawie istniejącego checkpointu:\n"
             f"    Ścieżka checkpointu: {checkpoint_path}\n"
             f"    Ścieżka configu związanego z checkpointem: {checkpoint_path}"
         )
+
+        training_config_path = checkpoint_path.parent.parent / 'configs' / 'training.yaml'
+        training_config = load_config(
+            config_path=training_config_path,
+            config_type='training',
+            check_consistency=True
+        )
+
+        dataset_config_path = checkpoint_path.parent.parent / 'configs' / 'dataset.yaml'
+        model_config_path = checkpoint_path.parent.parent / 'configs' / 'model.yaml'
     else:
         print(
             f"Tworzenie eksperymentu na podstawie pliku konfiguracyjnego YAML:\n"
-            f"    Ścieżka: {config_path}"
+            f"    Ścieżka: {training_config_path}"
         )
 
-    config = load_config(config_path=config_path, check_consistency=True)
+        training_config = load_config(
+            config_path=training_config_path,
+            config_type='training',
+            check_consistency=True
+        )
 
-    dataset: BaseDataset = build_dataset(config=config)
+        dataset_config_path = DATASET_NAME_TO_CONFIG_PATH_MAP[ training_config['dataset'] ]
+        model_config_path = MODEL_NAME_TO_CONFIG_PATH_MAP[ training_config['model'] ]
 
-    dataset_name = config['dataset']['name']
+    dataset_config = load_config(
+        config_path=dataset_config_path,
+        config_type='dataset',
+        check_consistency=True
+    )
+
+    model_config = load_config(
+        config_path=model_config_path,
+        config_type='model',
+        check_consistency=True
+    )
+
+    dataset: BaseDataset = build_dataset(
+        dataset_config=dataset_config,
+        model_config=model_config
+    )
+
+    dataset_name = dataset_config['dataset']['name']
 
     experiment_path = EXPERIMENTS_PATH / dataset_name / experiment_name
 
@@ -104,7 +137,9 @@ def create_experiment(
         _create_directories(experiment_path=experiment_path)
         _create_empty_files(experiment_path=experiment_path)
 
-        shutil.copy2(config_path, (experiment_path / 'config.yaml'))
+        shutil.copy2(dataset_config_path, (experiment_path / 'configs' / 'dataset.yaml'))
+        shutil.copy2(model_config_path, (experiment_path / 'configs' / 'model.yaml'))
+        shutil.copy2(training_config_path, (experiment_path / 'configs' / 'training.yaml'))
 
         if creating_from_checkpoint:
             shutil.copytree(
@@ -117,10 +152,10 @@ def create_experiment(
         else:
             generate_split(
                 dataset=dataset,
-                train_split=config['training']['splits']['train'],
-                validation_split=config['training']['splits']['validation'],
-                test_split=config['training']['splits']['test'],
-                random_seed=config['training']['splits']['random_seed'],
+                train_split=training_config['training']['splits']['train'],
+                validation_split=training_config['training']['splits']['validation'],
+                test_split=training_config['training']['splits']['test'],
+                random_seed=training_config['training']['splits']['random_seed'],
                 output_directory=(experiment_path / 'splits/')
             )
 

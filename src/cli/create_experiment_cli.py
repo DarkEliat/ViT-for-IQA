@@ -2,16 +2,15 @@ import argparse
 from dataclasses import dataclass
 from pathlib import Path
 
+from src.cli.validators import validate_training_config_name_arg, validate_checkpoint_path_arg
 from src.experiments.experiments import create_experiment
 from src.cli.base_cli_command import BaseCliCommand
 from src.cli.arguments import (
-    add_checkpoint_name_arg,
-    add_experiment_path_arg,
-    add_global_config_name_arg,
-    add_experiment_name_arg
+    add_experiment_name_arg,
+    add_training_config_name_arg,
+    add_checkpoint_path_arg
 )
-from src.cli.validators import validate_experiment_path_arg
-from src.utils.paths import CONFIGS_PATH
+from src.utils.paths import CONFIGS_PATH, EXPERIMENTS_PATH
 
 
 @dataclass(frozen=True)
@@ -19,12 +18,11 @@ class ExperimentCreationCliArgs:
     # Both modes:
     experiment_name: str
 
-    # Mode `from_global_config`:
-    global_config_name: str | None
+    # Mode `from_config`:
+    training_config_name: str | None
 
     # Mode `from_checkpoint`:
-    experiment_path: Path | None
-    checkpoint_name: str | None
+    checkpoint_path: Path | None
 
 
 class ExperimentCreationCliCommand( BaseCliCommand[ExperimentCreationCliArgs] ):
@@ -44,71 +42,71 @@ class ExperimentCreationCliCommand( BaseCliCommand[ExperimentCreationCliArgs] ):
     def add_args(self, parser: argparse.ArgumentParser) -> None:
         add_experiment_name_arg(parser=parser, required=True)
 
-        add_global_config_name_arg(parser=parser, required=False)
-
-        add_experiment_path_arg(parser=parser, required=False)
-        add_checkpoint_name_arg(parser=parser, required=False)
+        add_training_config_name_arg(parser=parser, required=False)
+        add_checkpoint_path_arg(parser=parser, required=False)
 
 
     def validate_and_normalize_args(self, parsed_namespace: argparse.Namespace) -> ExperimentCreationCliArgs:
         experiment_name = parsed_namespace.experiment_name
+        training_config_name = parsed_namespace.training_config_name
+        checkpoint_path = parsed_namespace.checkpoint_path
 
-        global_config_name = parsed_namespace.global_config_name
+        if training_config_name is not None:
+            validate_training_config_name_arg(training_config_name=training_config_name)
+        if checkpoint_path is not None:
+            checkpoint_path = EXPERIMENTS_PATH / checkpoint_path
+            validate_checkpoint_path_arg(checkpoint_path=checkpoint_path)
 
-        experiment_path = parsed_namespace.experiment_path
-        checkpoint_name = parsed_namespace.checkpoint_name
+        is_config_mode = training_config_name is not None
+        is_checkpoint_mode = checkpoint_path is not None
 
-        is_global_config_mode = global_config_name is not None
-        is_checkpoint_mode = (experiment_path is not None) and (checkpoint_name is not None)
+        proper_use_message = '''
+        Użyj:\n
+            --experiment-name <new_experiment_name>\n
+                oraz\n
+            --training-dataset_config-name <training_*.yaml>\n
+        albo:\n
+            --experiment-name <new_experiment_name>\n
+                oraz\n
+            --checkpoint-path <dataset_name>/<experiment_name>/checkpoints/<file.pth>
+        '''
 
-        if is_global_config_mode and is_checkpoint_mode:
+        if is_config_mode and is_checkpoint_mode:
             raise ValueError(
-                'Error: Nieprawidłowa kombinacja argumentów.\n'
-                'Użyj:\n'
-                '    --global-config <config.yaml>\n'
-                'albo:\n'
-                '    --experiment-path <directory path> --checkpoint <file.pth>\n'
-                'ale nie obie kombinacje na raz.'
+                f"Error: Nieprawidłowa kombinacja argumentów.\n"
+                f"{proper_use_message}"
             )
 
-        if not is_global_config_mode and not is_checkpoint_mode:
+        if not is_config_mode and not is_checkpoint_mode:
             raise ValueError(
-                'Error: Brakujące wymagane argumenty.\n'
-                'Użyj:\n'
-                '    --global-config <config.yaml>\n'
-                'albo:\n'
-                '    --experiment-path <directory path> --checkpoint <file.pth>'
+                f"Error: Brakujące wymagane argumenty.\n"
+                f"{proper_use_message}"
             )
 
-        if is_global_config_mode:
+        if is_config_mode:
             return ExperimentCreationCliArgs(
                 experiment_name=experiment_name,
-                global_config_name=global_config_name,
-                experiment_path=None,
-                checkpoint_name=None
+                training_config_name=training_config_name,
+                checkpoint_path=None
             )
-
-        experiment_path = validate_experiment_path_arg(experiment_path=experiment_path)
 
         return ExperimentCreationCliArgs(
             experiment_name=experiment_name,
-            global_config_name=None,
-            experiment_path=experiment_path,
-            checkpoint_name=checkpoint_name
+            training_config_name=None,
+            checkpoint_path=checkpoint_path
         )
 
 
     def run_command(self, normalized_args: ExperimentCreationCliArgs) -> None:
         experiment_name = normalized_args.experiment_name
-        global_config_name = normalized_args.global_config_name
-        experiment_path = normalized_args.experiment_path
-        checkpoint_name = normalized_args.checkpoint_name
 
-        global_config_path = (CONFIGS_PATH / global_config_name) if global_config_name else None
-        checkpoint_path = (experiment_path / 'checkpoints' / checkpoint_name) if experiment_path and checkpoint_name else None
+        training_config_name = normalized_args.training_config_name
+        training_config_path = CONFIGS_PATH / training_config_name
+
+        checkpoint_path = normalized_args.checkpoint_path
 
         create_experiment(
             experiment_name=experiment_name,
-            config_path=global_config_path,
+            training_config_path=training_config_path,
             checkpoint_path=checkpoint_path
         )

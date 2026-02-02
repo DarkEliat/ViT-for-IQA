@@ -4,13 +4,13 @@ import numpy as np
 from scipy.io import loadmat
 
 from src.datasets.base_dataset import BaseDataset
-from src.utils.data_types import Label, QualityScore, UnifiedQualityScore
+from src.utils.data_types import Label, QualityScore, UnifiedQualityScore, ModelConfig
 from src.utils.quality_scores import normalize_min_max
 
 
 class LiveDataset(BaseDataset[ list[dict[str, Any]] ]):
-    def __init__(self, config):
-        super().__init__(config=config)
+    def __init__(self, dataset_config, model_config: ModelConfig):
+        super().__init__(dataset_config=dataset_config, model_config=model_config)
 
         self._labels_container = self._build_labels_container()
 

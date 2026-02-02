@@ -1,0 +1,22 @@
+config_name: "dataset_live"
+
+app_version: "0.1.1"
+
+dataset:
+  representative_name: "LIVE Wild Compressed Picture Quality Database"
+  name: "live"
+  original_image_size:
+    width: 500
+    height: 500
+  images:
+    reference:
+      path: "datasets/live/Images/"
+      count: 80
+    distorted:
+      path: "datasets/live/Images/"
+      count: 320
+  quality_label:
+    type: "mos"
+    min: 1
+    max: 100
+  labels_path: "datasets/live/MOS.mat"

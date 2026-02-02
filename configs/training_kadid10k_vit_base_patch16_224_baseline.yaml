@@ -1,0 +1,34 @@
+config_name: "training_kadid10k_vit_base_patch16_224_baseline"
+
+app_version: "0.1.1"
+
+dataset: "kadid10k"
+
+model: "vit_base_patch16_224"
+
+training:
+  quality_label:
+    type: "unified_quality_score"
+    min: 0
+    max: 1
+  splits:
+    train: 0.6
+    validation: 0.2
+    test: 0.2
+    random_seed: 42
+  batch_size: 8
+  num_of_epochs: 100
+  early_stopping:
+    enabled: false
+    max_epochs_without_improvement: 5
+    min_improvement_delta: 0.001
+  learning_rate: 0.0001
+  device: "cuda"
+  num_of_workers: 4
+  checkpointing:
+    enabled: true
+    save_every_n_epochs: 20
+    save_last_epoch: true
+    save_best_epoch: true
+  logging:
+    tensorboard: true

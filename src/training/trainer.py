@@ -10,7 +10,7 @@ from torch.utils.tensorboard import SummaryWriter
 from src.evaluation.correlation_metrics import CorrelationMetrics, compute_correlations
 from src.models.vit_regressor import VitRegressor
 from src.utils.checkpoints import load_checkpoint_pickle
-from src.utils.configs import load_config
+from src.configs.loader import load_config
 from src.datasets.factory import build_data_loader
 from src.utils.data_types import LossMetrics, CheckpointInfo, CheckpointPickle
 
@@ -31,25 +31,45 @@ class Trainer:
         self.logs_tensorboard_path = self.logs_path / 'tensorboard/'
         self.splits_path = experiment_path / 'splits/'
 
-        config_path = experiment_path / 'config.yaml'
-        config = load_config(config_path=config_path, check_consistency=True)
-        self.config = config
+        dataset_config_path = experiment_path / 'configs' / 'dataset.yaml'
+        model_config_path = experiment_path / 'configs' / 'model.yaml'
+        training_config_path = experiment_path / 'configs' / 'training.yaml'
+
+        dataset_config = load_config(
+            config_path=dataset_config_path,
+            config_type='dataset',
+            check_consistency=True
+        )
+        model_config = load_config(
+            config_path=model_config_path,
+            config_type='model',
+            check_consistency=True
+        )
+        training_config = load_config(
+            config_path=training_config_path,
+            config_type='training',
+            check_consistency=True
+        )
+
+        self.dataset_config = dataset_config
+        self.model_config = model_config
+        self.training_config = training_config
 
         print(
             f"\n[Trainer] Rozpoczęto ładowanie eksperymentu:\n"
             f"    Nazwa eksperymentu: `{self.experiment_name}`\n"
             f"    Ścieżka eksperymentu: {self.experiment_path}\n"
-            f"    Nazwa configu: `{self.config['config_name']}`"
+            f"    Nazwa configu treningowego: `{self.training_config['config_name']}`"
         )
 
-        self.dataset_name = config['dataset']['name']
+        self.dataset_name = dataset_config['dataset']['name']
 
-        self.device = config['training']['device']
+        self.device = training_config['training']['device']
 
         # Inicjalizacja modelu
         self.model = VitRegressor(
-            model_name=config['model']['name'],
-            embedding_dimension=config['model']['embedding_dimension']
+            model_name=model_config['model']['name'],
+            embedding_dimension=model_config['model']['embedding_dimension']
         ).to(self.device)
 
         # Funkcja straty
@@ -64,29 +84,33 @@ class Trainer:
         # Optymalizatora
         self.optimizer: Optimizer = Adam(
             params=self.model.parameters(),
-            lr=config['training']['learning_rate']
+            lr=training_config['training']['learning_rate']
         )
 
         # Logowanie
         self.log_writer = (
             SummaryWriter(str(self.logs_tensorboard_path))
-            if config['logging']['tensorboard']
+            if training_config['training']['logging']['tensorboard']
             else None
         )
 
-        print('\n[Trainer] Załadowano eksperyment!')
-
         # Data Loadery
         self.train_loader = build_data_loader(
-            config=config,
+            dataset_config=dataset_config,
+            model_config=model_config,
+            training_config=training_config,
             split_name='train',
             experiment_path=experiment_path
         )
         self.validation_loader = build_data_loader(
-            config=config,
+            dataset_config=dataset_config,
+            model_config=model_config,
+            training_config=training_config,
             split_name='validation',
             experiment_path=experiment_path
         )
+
+        print('\n[Trainer] Załadowano eksperyment!')
 
 
     def train_one_epoch(self) -> float:
@@ -178,15 +202,15 @@ class Trainer:
         }
 
         if (
-                self.config['checkpointing']['save_every_n_epochs'] > 0 and
-                self.last_epoch.epoch % self.config['checkpointing']['save_every_n_epochs'] == 0
+                self.training_config['training']['checkpointing']['save_every_n_epochs'] > 0 and
+                self.last_epoch.epoch % self.training_config['training']['checkpointing']['save_every_n_epochs'] == 0
         ):
             save_checkpoint_triggers['save_every_n_epochs'] = True
 
-        if self.config['checkpointing']['save_last_epoch']:
+        if self.training_config['training']['checkpointing']['save_last_epoch']:
             save_checkpoint_triggers['save_last_epoch'] = True
 
-        if self.config['checkpointing']['save_best_epoch']:
+        if self.training_config['training']['checkpointing']['save_best_epoch']:
             last_srcc = self.last_epoch.validation_correlation.srcc
             best_srcc = self.best_epoch.validation_correlation.srcc
             min_delta = self.best_min_delta
@@ -218,7 +242,7 @@ class Trainer:
             'optimizer_state_dict': self.optimizer.state_dict(),
             'last_epoch': self.last_epoch,
             'best_epoch': self.best_epoch,
-            'config': self.config
+            'dataset_config': self.training_config
         }
 
         print(f"[Trainer] Zapisano checkpoint do:")
@@ -306,7 +330,7 @@ class Trainer:
 
         checkpoint_to_load = self.checkpoints_path
 
-        if last_checkpoint_exist and not self.config['checkpointing']['save_last_epoch']:
+        if last_checkpoint_exist and not self.training_config['training']['checkpointing']['save_last_epoch']:
             print(
                 '\nWARNING: [Trainer] Znaleziono checkpoint `last.pth`.\n'
                 '    Jednocześnie parametr konfiguracyjny `checkpointing.save_last_epoch` jest ustawiony na `false`.\n'
@@ -367,7 +391,7 @@ class Trainer:
         return 0
 
     def train(self) -> None:
-        num_of_epochs = self.config['training']['num_of_epochs']
+        num_of_epochs = self.training_config['training']['num_of_epochs']
         start_epoch = 1
 
         epoch_from_checkpoint = self.try_resume()

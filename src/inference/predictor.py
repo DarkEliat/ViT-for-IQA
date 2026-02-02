@@ -5,7 +5,7 @@ from torch.utils.data import DataLoader
 
 from src.models.vit_regressor import VitRegressor
 from src.utils.checkpoints import load_checkpoint_pickle
-from src.utils.configs import load_config
+from src.configs.loader import load_config
 from src.datasets.factory import build_data_loader
 from src.utils.data_types import SplitName
 
@@ -13,50 +13,70 @@ from src.utils.data_types import SplitName
 class Predictor:
     def __init__(
             self,
-            experiment_path: Path,
-            checkpoint_name: str = 'last.pth',
+            checkpoint_path: Path,
             batch_size_override: int | None = None,
             num_of_workers_override: int | None = None
     ) -> None:
-        if not experiment_path.exists() or not experiment_path.is_dir():
+        if not checkpoint_path.exists() or not checkpoint_path.is_file():
             raise FileNotFoundError(
-                f"Error: Wskazany eksperyment nie istnieje!\n"
-                f"Ścieżka: {experiment_path}"
+                f"Error: Wskazany checkpoint nie istnieje!\n"
+                f"Ścieżka: {checkpoint_path}"
             )
 
-        self.experiment_path = experiment_path
+        print('\n[Predictor] Rozpoczęto ładowanie checkpointu...')
 
-        config_path = experiment_path / 'config.yaml'
-        checkpoint_path = experiment_path / 'checkpoints' / checkpoint_name
         self.checkpoint_path = checkpoint_path
 
-        config = load_config(config_path=config_path, check_consistency=True)
+        experiment_path = checkpoint_path.parent.parent
+        self.experiment_path = experiment_path
 
-        config['training']['batch_size'] = (
+        checkpoint_dataset_config_path = experiment_path / 'configs' / 'dataset.yaml'
+        checkpoint_model_config_path = experiment_path / 'configs' / 'model.yaml'
+        checkpoint_training_config_path = experiment_path / 'configs' / 'training.yaml'
+
+        checkpoint_dataset_config = load_config(
+            config_path=checkpoint_dataset_config_path,
+            config_type='dataset',
+            check_consistency=True
+        )
+        checkpoint_model_config = load_config(
+            config_path=checkpoint_model_config_path,
+            config_type='model',
+            check_consistency=True
+        )
+        checkpoint_training_config = load_config(
+            config_path=checkpoint_training_config_path,
+            config_type='training',
+            check_consistency=True
+        )
+
+        checkpoint_training_config['training']['batch_size'] = (
             batch_size_override
             if batch_size_override
-            else config['training']['batch_size']
+            else checkpoint_training_config['training']['batch_size']
         )
-        config['training']['num_of_workers'] = (
+        checkpoint_training_config['training']['num_of_workers'] = (
             num_of_workers_override
             if num_of_workers_override
-            else config['training']['batch_size']
+            else checkpoint_training_config['training']['batch_size']
         )
 
-        self.config = config
+        self.checkpoint_dataset_config = checkpoint_dataset_config
+        self.checkpoint_model_config = checkpoint_model_config
+        self.checkpoint_training_config = checkpoint_training_config
 
         print(
             f"\n[Predictor] Rozpoczęto ładowanie checkpointu:\n"
             f"    Ścieżka eksperymentu: {experiment_path}\n"
-            f"    Nazwa checkpointu: `{checkpoint_name}`\n"
-            f"    Nazwa configu: `{self.config['config_name']}`"
+            f"    Nazwa checkpointu: `{checkpoint_path.name}`\n"
+            f"    Nazwa configu treningowego: `{self.checkpoint_training_config['config_name']}`"
         )
 
-        self.device = config['training']['device']
+        self.device = checkpoint_training_config['training']['device']
 
         self.model = VitRegressor(
-            model_name=config['model']['name'],
-            embedding_dimension=config['model']['embedding_dimension']
+            model_name=checkpoint_model_config['model']['name'],
+            embedding_dimension=checkpoint_model_config['model']['embedding_dimension']
         ).to(self.device)
 
         checkpoint_pickle = load_checkpoint_pickle(
@@ -69,7 +89,12 @@ class Predictor:
         self.model.to(self.device)
         self.model.eval()
 
-        print('\n[Predictor] Załadowano checkpoint!')
+        print(
+            f"\n[Predictor] Załadowano checkpoint:\n"
+            f"    Ścieżka eksperymentu: {experiment_path}\n"
+            f"    Nazwa checkpointu: `{checkpoint_path.name}`\n"
+            f"    Nazwa configu treningowego: `{self.checkpoint_training_config['config_name']}`"
+        )
 
 
     @torch.no_grad()
@@ -140,11 +165,13 @@ class Predictor:
 
 
     @torch.no_grad()
-    def predict_on_training_dataset(self, split_name: SplitName = 'full') -> list[float]:
-        print('\n[Predictor] Rozpoczęto predykcję na całym datasetcie, na którym szkolony był model...')
+    def predict_on_training_dataset(self, split_name: SplitName = 'test') -> list[float]:
+        print(f"\n[Predictor] Rozpoczęto predykcję na datasetcie, na którym szkolony był model (split: `{split_name}`)...")
 
         training_data_loader = build_data_loader(
-            config=self.config,
+            dataset_config=self.checkpoint_dataset_config,
+            model_config=self.checkpoint_model_config,
+            training_config=self.checkpoint_training_config,
             split_name=split_name,
             experiment_path=self.experiment_path,
         )

@@ -1,13 +1,13 @@
 import pandas as pd
 
 from src.datasets.base_dataset import BaseDataset
-from src.utils.data_types import Label, QualityScore, UnifiedQualityScore
+from src.utils.data_types import Label, QualityScore, UnifiedQualityScore, ModelConfig
 from src.utils.quality_scores import dmos_to_quality_score
 
 
 class Kadid10kDataset(BaseDataset[ pd.DataFrame ]):
-    def __init__(self, config):
-        super().__init__(config=config)
+    def __init__(self, dataset_config, model_config: ModelConfig):
+        super().__init__(dataset_config=dataset_config, model_config=model_config)
 
         self._labels_container = self._build_labels_container()
 

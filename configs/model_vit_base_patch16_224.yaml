@@ -1,0 +1,20 @@
+config_name: "model_vit_base_patch16_224"
+
+app_version: "0.1.1"
+
+model:
+  name: "vit_base_patch16_224"
+  input:
+    type: "images"
+    num_of_images: 2
+    have_same_image_size: true
+    are_images_square: true
+    image_size:
+      width: 224
+      height: 224
+    keep_original_aspect_ratio: true
+  embedding_dimension: 768
+  output:
+    type: "unified_quality_score"
+    min: 0
+    max: 1
