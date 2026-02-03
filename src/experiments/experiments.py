@@ -80,21 +80,23 @@ def create_experiment(
     EXPERIMENTS_PATH.mkdir(exist_ok=True)
 
     if creating_from_checkpoint:
+        configs_path = checkpoint_path.parent.parent / 'configs/'
+
         print(
             f"Tworzenie eksperymentu na podstawie istniejącego checkpointu:\n"
             f"    Ścieżka checkpointu: {checkpoint_path}\n"
-            f"    Ścieżka configu związanego z checkpointem: {checkpoint_path}"
+            f"    Ścieżka configów związanych z checkpointem: {configs_path}"
         )
 
-        training_config_path = checkpoint_path.parent.parent / 'configs' / 'training.yaml'
+        training_config_path = configs_path / 'training.yaml'
         training_config = load_config(
             config_path=training_config_path,
             config_type='training',
             check_consistency=True
         )
 
-        dataset_config_path = checkpoint_path.parent.parent / 'configs' / 'dataset.yaml'
-        model_config_path = checkpoint_path.parent.parent / 'configs' / 'model.yaml'
+        dataset_config_path = configs_path / 'dataset.yaml'
+        model_config_path = configs_path / 'model.yaml'
     else:
         print(
             f"Tworzenie eksperymentu na podstawie pliku konfiguracyjnego YAML:\n"

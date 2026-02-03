@@ -54,5 +54,5 @@ def add_skip_checkpoint_consistency_check_arg(parser: argparse.ArgumentParser, *
         '--skip-checkpoint-consistency-check',
         required=required,
         action='store_false',
-        help='Nazwa splitu datasetu. Dostępne splity: `train`, `val`, `test`.',
+        help="Pomija sprawdzanie spójności zapisanego checkpointu z najnowszymi wymaganiami template'u checkpointu.",
     )

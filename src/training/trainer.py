@@ -300,7 +300,7 @@ class Trainer:
 
         checkpoint_name = checkpoint_path.name
         if checkpoint_name != 'best.pth':
-            another_checkpoint_pickle = self.get_best_checkpoint()
+            another_checkpoint_pickle = self.get_best_checkpoint(check_consistency=check_consistency)
 
             best_checkpoint_pickle = another_checkpoint_pickle or checkpoint_pickle
 
