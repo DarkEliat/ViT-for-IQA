@@ -87,4 +87,7 @@ class CheckpointPickle:
     optimizer_state_dict: StateDict
     last_epoch: CheckpointInfo
     best_epoch: CheckpointInfo
-    config: TrainingConfig
+    app_version: str
+    dataset_config: DatasetConfig
+    model_config: ModelConfig
+    training_config: TrainingConfig

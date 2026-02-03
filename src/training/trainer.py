@@ -242,7 +242,10 @@ class Trainer:
             'optimizer_state_dict': self.optimizer.state_dict(),
             'last_epoch': self.last_epoch,
             'best_epoch': self.best_epoch,
-            'dataset_config': self.training_config
+            'app_version': self.training_config['app_version'],
+            'dataset_config': self.dataset_config,
+            'model_config': self.model_config,
+            'training_config': self.training_config
         }
 
         print(f"[Trainer] Zapisano checkpoint do:")

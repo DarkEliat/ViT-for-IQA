@@ -1,11 +1,11 @@
 import pandas as pd
 
 from src.datasets.base_dataset import BaseDataset
-from src.utils.data_types import Label, QualityScore, ModelConfig
+from src.utils.data_types import Label, QualityScore, DatasetConfig, ModelConfig
 
 
 class Kadid10kDataset(BaseDataset[ pd.DataFrame ]):
-    def __init__(self, dataset_config, model_config: ModelConfig):
+    def __init__(self, dataset_config: DatasetConfig, model_config: ModelConfig):
         super().__init__(dataset_config=dataset_config, model_config=model_config)
 
         self._labels_container = self._build_labels_container()
@@ -81,8 +81,8 @@ class Kadid10kDataset(BaseDataset[ pd.DataFrame ]):
             distorted_image_name=label['distorted_image_name'],
             quality_score=QualityScore(
                 type='dmos',
-                min_value=self.config['dataset']['quality_label']['min'],
-                max_value=self.config['dataset']['quality_label']['max'],
+                min_value=self.dataset_config['dataset']['quality_label']['min'],
+                max_value=self.dataset_config['dataset']['quality_label']['max'],
                 value=label['quality_score'],
                 normalized=False,
                 model_target=False

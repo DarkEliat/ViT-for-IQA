@@ -18,7 +18,8 @@ LabelsContainerType = TypeVar('LabelsContainerType')
 
 class BaseDataset(ABC, TorchDataset, Generic[LabelsContainerType]):
     def __init__(self, dataset_config: DatasetConfig, model_config: ModelConfig):
-        self._config = dataset_config
+        self._dataset_config = dataset_config
+        self._model_config = model_config
 
         self._labels_path = PROJECT_ROOT_PATH / dataset_config['dataset']['labels_path']
 
@@ -88,8 +89,12 @@ class BaseDataset(ABC, TorchDataset, Generic[LabelsContainerType]):
         return self._labels_path
 
     @property
-    def config(self) -> DatasetConfig:
-        return self._config
+    def dataset_config(self) -> DatasetConfig:
+        return self._dataset_config
+
+    @property
+    def model_config(self) -> ModelConfig:
+        return self._model_config
 
     @property
     def reference_images_path(self) -> Path:
@@ -151,19 +156,19 @@ class BaseDataset(ABC, TorchDataset, Generic[LabelsContainerType]):
 
 
     def _unify_quality_score(self, value: float) -> UnifiedQualityScore:
-        quality_label_type = self.config['dataset']['quality_label']['type']
+        quality_label_type = self.dataset_config['dataset']['quality_label']['type']
         available_quality_label_types = list(get_args(QualityScoreType))
 
         if quality_label_type not in available_quality_label_types:
             raise TypeError(
-                f"Error: Załadowana konfiguracja `{self.config['config_name']}` używanego datasetu `{self.config['dataset']['name']}`\n"
+                f"Error: Załadowana konfiguracja `{self.dataset_config['config_name']}` używanego datasetu `{self.dataset_config['dataset']['name']}`\n"
                 f"informuje, że etykiety posiadają nieobsługiwany typ wskaźnika jakości: `{quality_label_type}`!\n"
                 f"Aktualnie obsługiwane są tylko poniższe typy wskaźników jakości:\n"
                 f"{available_quality_label_types}"
             )
 
-        quality_label_min = self.config['dataset']['quality_label']['min']
-        quality_label_max = self.config['dataset']['quality_label']['max']
+        quality_label_min = self.dataset_config['dataset']['quality_label']['min']
+        quality_label_max = self.dataset_config['dataset']['quality_label']['max']
 
         unified_quality_score_value = 0.0
 

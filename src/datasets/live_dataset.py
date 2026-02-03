@@ -4,11 +4,11 @@ import numpy as np
 from scipy.io import loadmat
 
 from src.datasets.base_dataset import BaseDataset
-from src.utils.data_types import Label, QualityScore, ModelConfig
+from src.utils.data_types import Label, QualityScore, DatasetConfig, ModelConfig
 
 
 class LiveDataset(BaseDataset[ list[dict[str, Any]] ]):
-    def __init__(self, dataset_config, model_config: ModelConfig):
+    def __init__(self, dataset_config: DatasetConfig, model_config: ModelConfig):
         super().__init__(dataset_config=dataset_config, model_config=model_config)
 
         self._labels_container = self._build_labels_container()
@@ -105,8 +105,8 @@ class LiveDataset(BaseDataset[ list[dict[str, Any]] ]):
             distorted_image_name=label['distorted_image_name'],
             quality_score=QualityScore(
                 type='mos',
-                min_value=self.config['dataset']['quality_label']['min'],
-                max_value=self.config['dataset']['quality_label']['max'],
+                min_value=self.dataset_config['dataset']['quality_label']['min'],
+                max_value=self.dataset_config['dataset']['quality_label']['max'],
                 value=label['quality_score'],
                 normalized=False,
                 model_target=False
