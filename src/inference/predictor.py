@@ -14,6 +14,7 @@ class Predictor:
     def __init__(
             self,
             checkpoint_path: Path,
+            check_checkpoint_consistency: bool = True,
             batch_size_override: int | None = None,
             num_of_workers_override: int | None = None
     ) -> None:
@@ -49,7 +50,6 @@ class Predictor:
             config_type='training',
             check_consistency=True
         )
-
         checkpoint_training_config['training']['batch_size'] = (
             batch_size_override
             if batch_size_override
@@ -65,13 +65,6 @@ class Predictor:
         self.checkpoint_model_config = checkpoint_model_config
         self.checkpoint_training_config = checkpoint_training_config
 
-        print(
-            f"\n[Predictor] Rozpoczęto ładowanie checkpointu:\n"
-            f"    Ścieżka eksperymentu: {experiment_path}\n"
-            f"    Nazwa checkpointu: `{checkpoint_path.name}`\n"
-            f"    Nazwa configu treningowego: `{self.checkpoint_training_config['config_name']}`"
-        )
-
         self.device = checkpoint_training_config['training']['device']
 
         self.model = VitRegressor(
@@ -82,7 +75,7 @@ class Predictor:
         checkpoint_pickle = load_checkpoint_pickle(
             checkpoint_path=checkpoint_path,
             device=self.device,
-            check_consistency=True
+            check_consistency=check_checkpoint_consistency
         )
 
         self.model.load_state_dict(checkpoint_pickle.model_state_dict)

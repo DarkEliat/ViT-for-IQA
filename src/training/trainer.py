@@ -269,7 +269,10 @@ class Trainer:
             print(f"    {best_checkpoint_path}")
 
 
-    def get_best_checkpoint(self) -> CheckpointPickle | None:
+    def get_best_checkpoint(
+            self,
+            check_consistency: bool = True
+    ) -> CheckpointPickle | None:
         best_checkpoint_path = self.checkpoints_path / 'best.pth'
 
         if not best_checkpoint_path.exists() or not best_checkpoint_path.is_file():
@@ -278,15 +281,19 @@ class Trainer:
         return load_checkpoint_pickle(
             checkpoint_path=best_checkpoint_path,
             device=self.device,
-            check_consistency=True
+            check_consistency=check_consistency
         )
 
 
-    def load_checkpoint(self, checkpoint_path: Path) -> int:
+    def load_checkpoint(
+            self,
+            checkpoint_path: Path,
+            check_consistency: bool = True
+    ) -> int:
         checkpoint_pickle = load_checkpoint_pickle(
             checkpoint_path=checkpoint_path,
             device=self.device,
-            check_consistency=True
+            check_consistency=check_consistency
         )
 
         best_checkpoint_pickle = checkpoint_pickle
@@ -319,7 +326,10 @@ class Trainer:
         return any(self.checkpoints_path.glob('*.pth'))
 
 
-    def try_resume(self) -> int:
+    def try_resume(
+            self,
+            check_checkpoint_consistency: bool = True
+    ) -> int:
         if not self.any_checkpoint_exists():
             return 0
 
@@ -381,7 +391,10 @@ class Trainer:
                 choice = choice.lower()
 
                 if choice in ('y', 't'):
-                    return self.load_checkpoint(checkpoint_path=checkpoint_to_load)
+                    return self.load_checkpoint(
+                        checkpoint_path=checkpoint_to_load,
+                        check_consistency=check_checkpoint_consistency
+                    )
                 elif choice == 'n':
                     input('PRZERYWAM DZIAŁANIE PROGRAMU! Naciśnij Enter...')
                     exit(1)
@@ -393,11 +406,14 @@ class Trainer:
 
         return 0
 
-    def train(self) -> None:
+    def train(
+            self,
+            check_checkpoint_consistency: bool = True
+    ) -> None:
         num_of_epochs = self.training_config['training']['num_of_epochs']
         start_epoch = 1
 
-        epoch_from_checkpoint = self.try_resume()
+        epoch_from_checkpoint = self.try_resume(check_checkpoint_consistency=check_checkpoint_consistency)
 
         if epoch_from_checkpoint > 1:
             start_epoch = epoch_from_checkpoint

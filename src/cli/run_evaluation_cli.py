@@ -6,7 +6,7 @@ from src.cli.base_cli_command import BaseCliCommand
 from src.cli.arguments import (
     add_checkpoint_path_arg,
     add_dataset_name_arg,
-    add_split_name_arg
+    add_split_name_arg, add_skip_checkpoint_consistency_check_arg
 )
 from src.cli.validators import (
     validate_checkpoint_path_arg,
@@ -26,6 +26,7 @@ class EvaluationCliArgs:
     checkpoint_path: Path
     dataset_name: DatasetName | None
     split_name: SplitName | None
+    skip_checkpoint_consistency_check: bool | None
 
 
 class EvaluationCliCommand(BaseCliCommand[EvaluationCliArgs]):
@@ -43,12 +44,14 @@ class EvaluationCliCommand(BaseCliCommand[EvaluationCliArgs]):
         add_checkpoint_path_arg(parser=parser, required=True)
         add_dataset_name_arg(parser=parser, required=False)
         add_split_name_arg(parser=parser, required=False)
+        add_skip_checkpoint_consistency_check_arg(parser=parser, required=False)
 
 
     def validate_and_normalize_args(self, parsed_namespace: argparse.Namespace) -> EvaluationCliArgs:
         checkpoint_path = EXPERIMENTS_PATH / parsed_namespace.checkpoint_path
         dataset_name = parsed_namespace.dataset_name
         split_name = parsed_namespace.split_name
+        skip_checkpoint_consistency_check = parsed_namespace.skip_checkpoint_consistency_check
 
         validate_checkpoint_path_arg(checkpoint_path=checkpoint_path)
         if dataset_name is not None:
@@ -85,7 +88,8 @@ class EvaluationCliCommand(BaseCliCommand[EvaluationCliArgs]):
         return EvaluationCliArgs(
             checkpoint_path=checkpoint_path,
             dataset_name=dataset_name,
-            split_name=split_name
+            split_name=split_name,
+            skip_checkpoint_consistency_check=skip_checkpoint_consistency_check
         )
 
 
@@ -93,8 +97,12 @@ class EvaluationCliCommand(BaseCliCommand[EvaluationCliArgs]):
         checkpoint_path = normalized_args.checkpoint_path
         dataset_name = normalized_args.dataset_name
         split_name: SplitName | None = normalized_args.split_name
+        skip_checkpoint_consistency_check: bool | None = normalized_args.skip_checkpoint_consistency_check
 
-        evaluator = Evaluator(checkpoint_path=checkpoint_path)
+        evaluator = Evaluator(
+            checkpoint_path=checkpoint_path,
+            check_checkpoint_consistency=skip_checkpoint_consistency_check
+        )
 
         if split_name is not None:
             experiment_path = checkpoint_path.parent.parent

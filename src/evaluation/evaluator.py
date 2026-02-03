@@ -15,6 +15,7 @@ class Evaluator:
     def __init__(
             self,
             checkpoint_path: Path,
+            check_checkpoint_consistency: bool = True,
             batch_size_override: int | None = None,
             num_of_workers_override: int | None = None
     ) -> None:
@@ -35,6 +36,7 @@ class Evaluator:
 
         self.predictor = Predictor(
             checkpoint_path=checkpoint_path,
+            check_checkpoint_consistency=check_checkpoint_consistency,
             batch_size_override=batch_size_override,
             num_of_workers_override=num_of_workers_override
         )

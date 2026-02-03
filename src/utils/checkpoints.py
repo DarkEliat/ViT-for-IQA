@@ -35,20 +35,20 @@ def load_checkpoint_pickle(
     training_config = checkpoint_dict.get('training_config')
 
     if app_version is None:
-        print('Warning: W ładowanym checkpointcie brakuje klucza `app_version`! Wartość zostanie ustawiona automatycznie na `unknown`...')
+        print('\nWARNING: W ładowanym checkpointcie brakuje klucza `app_version`! Wartość zostanie ustawiona automatycznie na `unknown`...')
         app_version = 'unknown'
 
     if dataset_config is None:
-        print('Warning: W ładowanym checkpointcie brakuje klucza `dataset_config`! Wartość zostanie ustawiona automatycznie na pusty dict (słownik)...')
+        print('\nWARNING: W ładowanym checkpointcie brakuje klucza `dataset_config`! Wartość zostanie ustawiona automatycznie na pusty dict (słownik)...')
         dataset_config = {}
 
-    if dataset_config is None:
-        print('Warning: W ładowanym checkpointcie brakuje klucza `model_config`! Wartość zostanie ustawiona automatycznie na pusty dict (słownik)...')
-        dataset_config = {}
+    if model_config is None:
+        print('\nWARNING: W ładowanym checkpointcie brakuje klucza `model_config`! Wartość zostanie ustawiona automatycznie na pusty dict (słownik)...')
+        model_config = {}
 
-    if dataset_config is None:
-        print('Warning: W ładowanym checkpointcie brakuje klucza `training_config`! Wartość zostanie ustawiona automatycznie na pusty dict (słownik)...')
-        dataset_config = {}
+    if training_config is None:
+        print('\nWARNING: W ładowanym checkpointcie brakuje klucza `training_config`! Wartość zostanie ustawiona automatycznie na pusty dict (słownik)...')
+        training_config = {}
 
     checkpoint_pickle = CheckpointPickle(
         model_state_dict=checkpoint_dict['model_state_dict'],

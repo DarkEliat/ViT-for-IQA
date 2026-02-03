@@ -1,7 +1,7 @@
 import argparse
 
 
-def add_experiment_name_arg(parser: argparse.ArgumentParser, *, required: bool = True) -> None:
+def add_experiment_name_arg(parser: argparse.ArgumentParser, *, required: bool) -> None:
     parser.add_argument(
         '--experiment-name',
         required=required,
@@ -9,7 +9,7 @@ def add_experiment_name_arg(parser: argparse.ArgumentParser, *, required: bool =
     )
 
 
-def add_experiment_path_arg(parser: argparse.ArgumentParser, *, required: bool = True) -> None:
+def add_experiment_path_arg(parser: argparse.ArgumentParser, *, required: bool) -> None:
     parser.add_argument(
         '--experiment-path',
         required=required,
@@ -25,7 +25,7 @@ def add_checkpoint_path_arg(parser: argparse.ArgumentParser, *, required: bool) 
     )
 
 
-def add_training_config_name_arg(parser: argparse.ArgumentParser, *, required: bool = True) -> None:
+def add_training_config_name_arg(parser: argparse.ArgumentParser, *, required: bool) -> None:
     parser.add_argument(
         '--training-config-name',
         required=required,
@@ -33,7 +33,7 @@ def add_training_config_name_arg(parser: argparse.ArgumentParser, *, required: b
     )
 
 
-def add_dataset_name_arg(parser: argparse.ArgumentParser, *, required: bool = True) -> None:
+def add_dataset_name_arg(parser: argparse.ArgumentParser, *, required: bool) -> None:
     parser.add_argument(
         '--dataset-name',
         required=required,
@@ -41,7 +41,7 @@ def add_dataset_name_arg(parser: argparse.ArgumentParser, *, required: bool = Tr
     )
 
 
-def add_split_name_arg(parser: argparse.ArgumentParser, *, required: bool = True) -> None:
+def add_split_name_arg(parser: argparse.ArgumentParser, *, required: bool) -> None:
     parser.add_argument(
         '--split-name',
         required=required,
@@ -49,4 +49,10 @@ def add_split_name_arg(parser: argparse.ArgumentParser, *, required: bool = True
     )
 
 
-
+def add_skip_checkpoint_consistency_check_arg(parser: argparse.ArgumentParser, *, required: bool) -> None:
+    parser.add_argument(
+        '--skip-checkpoint-consistency-check',
+        required=required,
+        action='store_false',
+        help='Nazwa splitu datasetu. Dostępne splity: `train`, `val`, `test`.',
+    )
