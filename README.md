@@ -91,14 +91,14 @@ The project supports automatic downloading and loading of the following datasets
 
 | Dataset Name | Config Name | Reference Images | Distorted Images | Score Type |
 | :--- | :--- | :--- | :--- | :--- |
-| **KADID-10k** | `kadid10k` | 81 | 10,125 | DMOS |
+| **KADID-10k** | `kadid10k` | 81 | 10,125 | MOS |
 | **TID2013** | `tid2013` | 25 | 3,000 | MOS |
 | **TID2008** | `tid2008` | 25 | 1,700 | MOS |
 | **LIVE** | `live` | 80 | 320 | MOS |
 
 **Unified Score Logic**:
 - **MOS (e.g., TID2013)**: Normalized to `[0, 1]`.
-- **DMOS (e.g., KADID-10k)**: Inverted and normalized to `[0, 1]` so that higher is always better.
+- **DMOS**: Inverted and normalized to `[0, 1]` so that higher is always better.
 
 ---
 
@@ -118,14 +118,14 @@ The project supports automatic downloading and loading of the following datasets
     cd ViT-for-IQA
     ```
 
-2.  **Install dependencies**:
-    ```bash
-    poetry install
-    ```
-
-3.  **Activate the environment**:
+2.  **Activate the environment**:
     ```bash
     poetry env activate
+    ```
+
+3.  **Install dependencies**:
+    ```bash
+    poetry install
     ```
 
 ---
@@ -137,7 +137,7 @@ The project supports automatic downloading and loading of the following datasets
 Use the included helper script to download and extract KADID-10k, TID2013, and TID2008 automatically:
 
 ```bash
-python scripts/download_datasets.py
+poetry run python -m scripts.download_datasets
 ```
 
 ### <a id="2-create-experiment"></a>2. Create an Experiment
@@ -145,9 +145,9 @@ python scripts/download_datasets.py
 Create a new experiment structure based on a predefined training configuration:
 
 ```bash
-python scripts/create_experiment.py \
+poetry run python -m scripts.create_experiment \
     --experiment-name "my_first_run" \
-    --training-config-name "training_kadid10k_vit_base_patch16_224_baseline.yaml"
+    --training-config-name "training_tid2013_vit_base_patch16_224_baseline.yaml"
 ```
 
 ### <a id="3-run-training"></a>3. Run Training
@@ -155,8 +155,8 @@ python scripts/create_experiment.py \
 Start the training loop:
 
 ```bash
-python scripts/run_training.py \
-    --experiment-path "experiments/kadid10k/my_first_run"
+poetry run python -m scripts.run_training \
+    --experiment-path "tid2013/my_first_run/"
 ```
 
 ### <a id="4-run-evaluation"></a>4. Predict & Evaluate
@@ -164,14 +164,14 @@ python scripts/run_training.py \
 Use prediction and evaluate the best model checkpoint on the test split:
 
 ```bash
-python scripts/run_prediction.py \
-    --checkpoint-path "experiments/kadid10k/my_first_run/checkpoints/best.pth" \
+poetry run python -m scripts.run_prediction \
+    --checkpoint-path "tid2013/my_first_run/checkpoints/best.pth" \
     --split-name "test"
 ```
 
 ```bash
-python scripts/run_evaluation.py \
-    --checkpoint-path "experiments/kadid10k/my_first_run/checkpoints/best.pth" \
+poetry run python -m scripts.run_evaluation \
+    --checkpoint-path "tid2013/my_first_run/checkpoints/best.pth" \
     --split-name "test"
 ```
 
@@ -184,6 +184,7 @@ The project functionality is exposed via scripts in the `scripts/` directory, wh
 ### Common Arguments
 - Paths are relative to the project root or `experiments/` directory where applicable.
 - Use `--help` on any script to see full options.
+- `--skip-checkpoint-consistency-check`: Skips validation of checkpoint metadata (available in training, prediction, evaluation).
 
 ### `create_experiment.py`
 
@@ -192,15 +193,15 @@ Creates a new experiment workspace with configs, logs, and split indices.
 **Modes:**
 1.  **From Config** (New Training):
     ```bash
-    python scripts/create_experiment.py \
-        --experiment-name "exp_name" \
-        --training-config-name "training_config.yaml"
+    poetry run python -m scripts.create_experiment \
+        --experiment-name <experiment_name> \
+        --training-config-name training_<dataset_name>_vit_base_patch16_224_baseline.yaml
     ```
 2.  **From Checkpoint** (Resume/Fine-tune):
     ```bash
-    python scripts/create_experiment.py \
-        --experiment-name "finetune_exp" \
-        --checkpoint-path "dataset/exp/checkpoints/best.pth"
+    poetry run python -m scripts.create_experiment \
+        --experiment-name <experiment_name> \
+        --checkpoint-path <dataset_name>/<experiment_name>/checkpoints/best.pth
     ```
 
 ### `run_training.py`
@@ -208,8 +209,8 @@ Creates a new experiment workspace with configs, logs, and split indices.
 Executes the training pipeline for a given experiment.
 
 ```bash
-python scripts/run_training.py \
-    --experiment-path "experiments/dataset/exp_name"
+poetry run python -m scripts.run_training \
+    --experiment-path <dataset_name>/<experiment_name>/
 ```
 *   **Resuming**: Automatically detects existing checkpoints in the experiment folder and asks to resume.
 
@@ -220,33 +221,40 @@ Calculates performance metrics (PLCC, SRCC, KRCC, RMSE).
 **Modes:**
 1.  **Split Evaluation** (Evaluate on a split of the training dataset):
     ```bash
-    python scripts/run_evaluation.py \
-        --checkpoint-path "experiments/dataset/exp/checkpoints/best.pth" \
-        --split-name "test"  # Options: train, validation, test
+    poetry run python -m scripts.run_evaluation \
+        --checkpoint-path <dataset_name>/<experiment_name>/checkpoints/best.pth \
+        --split-name <split_name>  # Options: train, validation, test
     ```
 2.  **Cross-Dataset Evaluation** (Evaluate on a completely different dataset):
     ```bash
-    python scripts/run_evaluation.py \
-        --checkpoint-path "experiments/dataset/exp/checkpoints/best.pth" \
-        --dataset-name "tid2013"
+    poetry run python -m scripts.run_evaluation \
+        --checkpoint-path <dataset_name>/<experiment_name>/checkpoints/best.pth \
+        --dataset-name <dataset_name>  # Options: live, tid2008, tid2013, kadid10k
     ```
 
 ### `run_prediction.py`
 
 Runs inference and outputs raw predicted scores.
 
-```bash
-python scripts/run_prediction.py \
-    --checkpoint-path "experiments/dataset/exp/checkpoints/best.pth" \
-    --split-name "test"
-    # OR --dataset-name "tid2013"
-```
+**Modes:**
+1.  **Split Evaluation** (Predict on a split of the training dataset):
+    ```bash
+    poetry run python -m scripts.run_prediction \
+        --checkpoint-path <dataset_name>/<experiment_name>/checkpoints/best.pth \
+        --split-name <split_name>  # Options: train, validation, test
+    ```
+2.  **Cross-Dataset Evaluation** (Predict on a full completely different dataset):
+    ```bash
+    poetry run python -m scripts.run_predicition \
+        --checkpoint-path <dataset_name>/<experiment_name>/checkpoints/best.pth \
+        --dataset-name <dataset_name>  # Options: live, tid2008, tid2013, kadid10k
+    ```
 
 ---
 
 ## <a id="configuration-system"></a>⚙️ Configuration System
 
-The configuration is modular, split into three YAML files found in `configs/` (source) and `experiments/.../configs/` (runtime):
+The configuration is modular, split into three YAML files found in `configs/` (source) and `experiments/<dataset_name>/<experiment_name>/configs/` (runtime):
 
 ### 1. Dataset Config (`dataset_*.yaml`)
 Defines image paths, counts, and original score characteristics (MOS/DMOS ranges).
@@ -255,16 +263,10 @@ Defines image paths, counts, and original score characteristics (MOS/DMOS ranges
 ### 2. Model Config (`model_*.yaml`)
 Defines the network architecture and input requirements.
 *   *Example:* `configs/model_vit_base_patch16_224.yaml`
-*   *Key Params:* `embedding_dimension`, `input.image_size`.
 
 ### 3. Training Config (`training_*.yaml`)
 Links a Model to a Dataset and defines the training hyperparameters.
 *   *Example:* `configs/training_kadid10k_vit_base_patch16_224_baseline.yaml`
-*   *Key Params:*
-    *   `dataset`: Name of the dataset to use (must match a defined dataset).
-    *   `model`: Name of the model to use.
-    *   `training.splits`: Train/Val/Test ratios (e.g., 0.6 / 0.2 / 0.2).
-    *   `training.checkpointing`: Save frequency and best-model tracking.
 
 ---
 
@@ -278,8 +280,8 @@ ViT-for-IQA/
 │   └── training_*.yaml                   # Training scenarios
 ├── datasets/                             # Raw Datasets (downloaded here)
 ├── experiments/                          # Experiment Workspaces
-│   └── {dataset_name}/
-│       └── {experiment_name}/
+│   └── <dataset_name>/
+│       └── <experiment_name>/
 │           ├── configs/                  # Frozen configs for this run
 │           ├── checkpoints/              # Saved models (.pth)
 │           ├── logs/                     # TensorBoard & Text logs
@@ -315,7 +317,7 @@ The system computes correlation metrics between the **Ground Truth** (subjective
     *   Another rank-based correlation metric.
 
 **Results Output**:
-Results are saved to `experiments/.../metrics.md` (Markdown report), `.json` (Machine readable), and `.csv` (Data analysis).
+Results are saved to `experiments/<dataset_name>/<experiment_name>/metrics.md` (Markdown report), `.json` (Machine readable), and `.csv` (Data analysis).
 
 ---
 
@@ -332,9 +334,12 @@ To prevent **Data Leakage**, splitting is performed by **Reference Image**:
 Saved `.pth` files are pickle objects (`CheckpointPickle`) containing:
 - `model_state_dict`: Weights.
 - `optimizer_state_dict`: Optimizer state.
-- `config`: Complete training configuration used.
 - `best_epoch`: Statistics of the best epoch so far.
 - `last_epoch`: Statistics of the current epoch.
+- `app_version`: App version string (e.g., `0.1.2`).
+- `dataset_config`: Dataset configuration used.
+- `model_config`: Model configuration used.
+- `training_config`: Training configuration used.
 
 ---
 
